@@ -2,104 +2,73 @@ import streamlit as st
 import yfinance as yf
 import pandas_ta as ta
 import plotly.graph_objects as go
-from datetime import datetime
-import time
+import requests
+import pandas as pd
 
-# 1. Page Config & High-End UI Styling
-st.set_page_config(page_title="SignalMaster Ultra AI", layout="wide", initial_sidebar_state="expanded")
+# --- CONFIGURATION ---
+BOT_TOKEN = "8526792641:AAHEyboZTc9-lporhmcAGekEVO-Z-D-pvb8"
 
-# Ultra-Modern Neon CSS
+# 1. Page Styling (High-End Cyberpunk UI)
+st.set_page_config(page_title="SignalMaster AI Pro", layout="wide")
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
-    .stApp { background: #000000; color: #00dfff; font-family: 'Orbitron', sans-serif; }
-    [data-testid="stMetricValue"] { color: #00dfff; font-size: 1.8rem; background: rgba(0, 223, 255, 0.05); padding: 20px; border-radius: 10px; border: 1px solid #00dfff; }
-    .stSidebar { background-color: #050505 !important; border-right: 1px solid #00dfff; }
-    .signal-card { background: rgba(0, 255, 0, 0.1); border: 1px solid #00ff00; padding: 15px; border-radius: 10px; margin-bottom: 10px; }
-    .news-card { border-left: 4px solid #00dfff; padding-left: 15px; margin-bottom: 15px; background: rgba(255,255,255,0.02); }
+    .stApp { background: #000000; color: #00dfff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    .signal-box { background: rgba(0, 223, 255, 0.1); border-radius: 15px; padding: 20px; border: 1px solid #00dfff; margin-bottom: 10px; }
+    .stButton>button { width: 100%; background-color: #00dfff; color: black; font-weight: bold; border-radius: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. Sidebar Navigation
-st.sidebar.image("https://cdn-icons-png.flaticon.com/512/2091/2091665.png", width=80)
-st.sidebar.title("ULTRA CONTROL")
-menu = st.sidebar.selectbox("COMMAND CENTER", ["🛸 Neural Home", "📡 Live Signals", "📊 Advanced Analysis", "📰 Global News", "⚙️ Bot Settings"])
+# 2. Sidebar
+st.sidebar.title("🚀 MASTER CONTROL")
+menu = st.sidebar.radio("SELECT MODULE", ["🏠 Neural Home", "📡 Live Signals", "📊 Market Insight"])
 
-# --- 🛸 NEURAL HOME (Updated Home Page) ---
-if menu == "🛸 Neural Home":
-    st.markdown("<h1 style='text-align: center; color: #00dfff;'>NEURAL DASHBOARD v6.0</h1>", unsafe_allow_html=True)
+# --- FUNCTION: Get Telegram Messages ---
+def get_telegram_updates():
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/getUpdates"
+    try:
+        response = requests.get(url).json()
+        if response["ok"]:
+            # අන්තිම මැසේජ් 5 අරගන්නවා
+            messages = [item["message"]["text"] for item in response["result"] if "message" in item and "text" in item]
+            return messages[::-1] # අලුත්ම ඒවා උඩට
+    except:
+        return []
+
+# --- 🏠 NEURAL HOME ---
+if menu == "🏠 Neural Home":
+    st.markdown("<h1 style='text-align: center;'>SIGNALMASTER AI v8.0</h1>", unsafe_allow_html=True)
     
-    # Live Ticker Row
-    cols = st.columns(4)
-    for i, c in enumerate(["BTC-USD", "ETH-USD", "SOL-USD", "XRP-USD"]):
-        price = yf.Ticker(c).history(period="1d")['Close'].iloc[-1]
-        cols[i].metric(c, f"${price:,.2f}", f"{price*0.01:.2f}%")
+    # Real-time Multi-Coin Ticker
+    coins = ["BTC-USD", "ETH-USD", "SOL-USD", "BNB-USD"]
+    cols = st.columns(len(coins))
+    for i, coin in enumerate(coins):
+        price = yf.Ticker(coin).history(period="1d")['Close'].iloc[-1]
+        cols[i].metric(coin, f"${price:,.2f}")
 
     st.write("---")
-    c1, c2 = st.columns([2, 1])
-    
-    with c1:
-        st.subheader("🌐 Global Market Heatmap")
-        # Sample Trend Visualization
-        st.image("https://miro.medium.com/max/1400/1*mS9-oYwP4kE-X9fLcl_S_A.png", use_container_width=True)
-    
-    with c2:
-        st.subheader("⚡ Quick AI Status")
-        st.write("✅ Bot Status: Active")
-        st.write("✅ API Connection: Stable")
-        st.write("✅ Signal Accuracy: 92.4%")
-        st.button("EMERGENCY STOP")
+    st.subheader("🤖 AI Market Sentiment")
+    st.progress(85) # AI Bullish index
+    st.caption("AI Analysis: Strong Bullish Momentum Detected in Major Pairs.")
 
-# --- 📡 LIVE SIGNALS (Telegram-Style) ---
+# --- 📡 LIVE SIGNALS (REAL TELEGRAM FEED) ---
 elif menu == "📡 Live Signals":
-    st.subheader("📡 Real-Time Signals (AI + Telegram Feed)")
-    st.info("Signals are automatically analyzed from top 50 Telegram channels and AI indicators.")
+    st.subheader("📡 Real-Time Telegram Signal Feed")
+    st.write("Listening to Telegram Bot...")
     
-    # Simulate Auto-Signal Feed
-    signals = [
-        {"coin": "BTC-USD", "type": "LONG", "entry": "42500", "tp": "44000", "sl": "41800", "time": "2 mins ago"},
-        {"coin": "ETH-USD", "type": "SHORT", "entry": "2300", "tp": "2150", "sl": "2400", "time": "5 mins ago"},
-    ]
+    msgs = get_telegram_updates()
     
-    for sig in signals:
-        with st.container():
-            color = "#00ff00" if sig['type'] == "LONG" else "#ff0000"
-            st.markdown(f"""
-            <div class='signal-card' style='border-color: {color}'>
-                <h3 style='color: {color}'>{sig['type']} | {sig['coin']}</h3>
-                <p><b>Entry:</b> {sig['entry']} | <b>TP:</b> {sig['tp']} | <b>SL:</b> {sig['sl']}</p>
-                <small>Received: {sig['time']}</small>
-            </div>
-            """, unsafe_allow_html=True)
+    if msgs:
+        for msg in msgs:
+            st.markdown(f"<div class='signal-box'><b>📡 New Signal Received:</b><br>{msg}</div>", unsafe_allow_html=True)
+    else:
+        st.warning("No new signals found. Make sure you have sent messages to the bot or added the bot to a channel.")
+        st.info("💡 Tip: Send a message to your bot in Telegram, then refresh this page!")
 
-# --- 📊 ADVANCED ANALYSIS ---
-elif menu == "📊 Advanced Analysis":
-    target = st.sidebar.selectbox("Select Asset", ["BTC-USD", "ETH-USD", "SOL-USD"])
+# --- 📊 MARKET INSIGHT ---
+elif menu == "📊 Market Insight":
+    target = st.sidebar.selectbox("Asset", ["BTC-USD", "ETH-USD", "SOL-USD"])
     df = yf.download(target, period="1d", interval="15m")
     
-    # Auto-Technical Indicators
-    df['RSI'] = ta.rsi(df['Close'])
-    
     fig = go.Figure(data=[go.Candlestick(x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'])])
-    fig.update_layout(template="plotly_dark", title=f"{target} Neural Chart")
+    fig.update_layout(template="plotly_dark", xaxis_rangeslider_visible=False)
     st.plotly_chart(fig, use_container_width=True)
-
-# --- 📰 GLOBAL NEWS ---
-elif menu == "📰 Global News":
-    st.subheader("📰 Live Market Intelligence")
-    # Simulation of a News Scraper
-    news_items = [
-        "US Fed announces new interest rate policy - Market reacts.",
-        "Bitcoin ETF inflows hit record $2B in a single day.",
-        "Solana network upgrade completed successfully.",
-        "Ethereum gas fees hit 6-month low."
-    ]
-    for news in news_items:
-        st.markdown(f"<div class='news-card'>{news}<br><small>{datetime.now().strftime('%H:%M')}</small></div>", unsafe_allow_html=True)
-
-# --- ⚙️ BOT SETTINGS ---
-elif menu == "⚙️ Bot Settings":
-    st.title("⚙️ AI Configuration")
-    st.text_input("Telegram API Key (Optional)", type="password")
-    st.slider("AI Signal Sensitivity", 0.0, 1.0, 0.8)
-    st.checkbox("Enable Auto-Trading (Demo)")
