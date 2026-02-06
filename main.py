@@ -29,7 +29,7 @@ st.markdown("""
 if 'user' not in st.session_state: st.session_state.user = None
 if 'orders' not in st.session_state:
     st.session_state.orders = [
-        {"id": 1, "order_id": "HS-1384", "customer": "Sharanga Malaka", "phone": "0702710550", "status": "pending"}
+        {"id": 1, "order_id": "821384", "customer": "Sharanga Malaka", "phone": "0702710550", "status": "pending"}
     ]
 
 # --- 4. AUTHENTICATION ---
@@ -45,7 +45,7 @@ if st.session_state.user is None:
                 st.rerun()
             else: st.error("Invalid Credentials!")
 else:
-    # --- 5. SIDEBAR ---
+    # --- 5. SIDEBAR (Happy Shop Branding) ---
     with st.sidebar:
         st.markdown(f"<div class='sidebar-title'>Happy Shop</div>", unsafe_allow_html=True)
         menu = st.selectbox("MAIN MENU", ["🏠 Dashboard", "📦 GRN", "💰 Expense", "🧾 Orders", "🚚 Shipped Items", "↩️ Return", "📊 Stocks", "🏷️ Products"])
@@ -75,13 +75,12 @@ else:
     # --- 7. CONTENT ---
     if menu == "🏠 Dashboard":
         st.subheader("Business Summary")
-        st.info("Welcome to Happy Shop Management System. All systems operational.")
+        st.info("Welcome to Happy Shop ERP. System is live and stable.")
 
     elif menu == "🧾 Orders" and sub_menu == "View Lead":
-        st.subheader("Interactive Order Status System")
+        st.subheader("Orders / Leads List")
 
-        # --- HTML/CSS/JS INTEGRATION ---
-        # Generating rows dynamically from session state
+        # --- HTML/JS INTEGRATION ---
         rows_html = ""
         for order in st.session_state.orders:
             rows_html += f"""
@@ -146,28 +145,32 @@ else:
                 const badge = document.getElementById("status"+id);
                 row.className = "status-" + status;
                 badge.className = "badge " + status;
-                badge.innerText = status.toUpperCase();
+                if(status === "confirm") badge.innerText = "Confirmed";
+                if(status === "hold") badge.innerText = "On Hold";
+                if(status === "noanswer") badge.innerText = "No Answer";
+                if(status === "cancel") badge.innerText = "Cancelled";
+                if(status === "fake") badge.innerText = "Fake";
             }}
         </script>
         </body>
         </html>
         """
-        components.html(html_code, height=400, scrolling=True)
+        components.html(html_code, height=500, scrolling=True)
 
     elif menu == "🧾 Orders" and sub_menu == "New Order":
-        st.subheader("Add New Lead")
+        st.subheader("Add New Lead / Order")
         with st.form("new_order"):
             c_name = st.text_input("Customer Name")
             c_phone = st.text_input("Phone Number")
             if st.form_submit_button("Save Order"):
                 new_id = len(st.session_state.orders) + 1
                 st.session_state.orders.append({
-                    "id": new_id, "order_id": f"HS-{1384+new_id}", 
+                    "id": new_id, "order_id": f"HS-{821384+new_id}", 
                     "customer": c_name, "phone": c_phone, "status": "pending"
                 })
-                st.success("Order saved!")
+                st.success("Order saved to leads list!")
                 st.rerun()
 
     else:
         st.subheader(f"{menu} > {sub_menu}")
-        st.write("Section is ready for data entry.")
+        st.write("Section ready for data.")
