@@ -2,133 +2,159 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-# --- 1. PAGE SETUP (වෙබ් එකට ගැලපෙන ලෙස) ---
+# --- 1. PAGE SETUP (ලස්සනට සහ මෙනු එක පේන්න) ---
 st.set_page_config(
     page_title="HappyShop Official ERP", 
     page_icon="🛒", 
     layout="wide", 
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded" # මෙනු එක හැමවෙලේම ඇරිලා තියෙන්න
 )
 
-# --- 2. CSS STYLING (Screenshot එකේ පෙනුම ලබා ගැනීමට) ---
+# --- 2. ADVANCED CSS (ලස්සන Dark/Orange Theme එකක්) ---
 st.markdown("""
     <style>
+    /* මුළු පිටුවම Dark Mode කිරීම */
+    .stApp { background-color: #0d1117; color: white; }
+    
+    /* මෙනු බාර් එකේ පෙනුම (Sidebar) */
+    [data-testid="stSidebar"] {
+        background-color: #001f3f !important;
+        min-width: 260px !important;
+    }
+    [data-testid="stSidebar"] * { color: white !important; }
+
+    /* මෙනු එකේ කැටගරි (Orange Headers) */
+    .menu-header {
+        background-color: #e67e22;
+        padding: 12px;
+        font-weight: bold;
+        border-radius: 8px;
+        margin: 15px 0px 5px 0px;
+        text-align: center;
+    }
+
+    /* Form Boxes (ලස්සනට කොටු කිරීම) */
+    .section-box {
+        background-color: #161b22;
+        padding: 20px;
+        border-radius: 12px;
+        border: 1px solid #30363d;
+        border-left: 6px solid #e67e22;
+        margin-bottom: 25px;
+    }
+
+    /* Input Fields ලස්සන කිරීම */
+    input, textarea, select {
+        background-color: #0d1117 !important;
+        color: white !important;
+        border: 1px solid #30363d !important;
+    }
+
+    /* අනවශ්‍ය දේවල් අයින් කිරීම */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
-    .stDeployButton {display:none;}
-    
-    [data-testid="stSidebar"] { background-color: #001f3f !important; }
-    [data-testid="stSidebar"] * { color: white !important; }
-    
-    .menu-header {
-        background-color: #e67e22;
-        padding: 10px;
-        font-weight: bold;
-        border-radius: 5px;
-        margin: 10px 0px;
-    }
-    .section-box {
-        background-color: #f8f9fa;
-        padding: 15px;
-        border-radius: 10px;
-        border-left: 5px solid #e67e22;
-        margin-bottom: 20px;
-    }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. LOGIN SYSTEM ---
+# --- 3. LOGIN SESSION ---
 if 'user' not in st.session_state:
     st.session_state.user = None
 
 def login():
-    st.markdown("<br><br><h1 style='text-align: center; color: #f1c40f;'>HappyShop ERP Login</h1>", unsafe_allow_html=True)
+    st.markdown("<br><br><h1 style='text-align: center; color: #f1c40f;'>HappyShop Web Portal</h1>", unsafe_allow_html=True)
     _, col2, _ = st.columns([1, 1.2, 1])
     with col2:
+        st.markdown("<div class='section-box'>", unsafe_allow_html=True)
         email = st.text_input("Username / Email")
-        password = st.text_input("Password", type="password")
-        if st.button("Log In", use_container_width=True):
-            if email == "happyshop@gmail.com" and password == "VLG0005":
+        pwd = st.text_input("Password", type="password")
+        if st.button("Log In to System", use_container_width=True):
+            if email == "happyshop@gmail.com" and pwd == "VLG0005":
                 st.session_state.user = {"name": "Admin", "role": "OWNER"}
                 st.rerun()
-            elif email == "demo1@gmail.com" and password == "demo1":
-                st.session_state.user = {"name": "Staff 01", "role": "STAFF"}
-                st.rerun()
-            elif email == "demo2@gmail.com" and password == "demo2":
-                st.session_state.user = {"name": "Staff 02", "role": "STAFF"}
+            elif (email == "demo1@gmail.com" and pwd == "demo1") or (email == "demo2@gmail.com" and pwd == "demo2"):
+                st.session_state.user = {"name": email.split('@')[0], "role": "STAFF"}
                 st.rerun()
             else:
-                st.error("Invalid Login!")
+                st.error("විස්තර වැරදියි!")
+        st.markdown("</div>", unsafe_allow_html=True)
 
 # --- 4. MAIN INTERFACE ---
 if st.session_state.user is None:
     login()
 else:
-    # Sidebar - Hamburger Menu (ඉරි 3)
+    # --- SIDEBAR MENU (මෙන්න මේක තමයි ඔයා ඉල්ලපු මෙනු එක) ---
     with st.sidebar:
-        st.markdown(f"### 🛒 HappyShop\nUser: {st.session_state.user['name']}")
+        st.markdown(f"<h2 style='text-align:center;'>🛒 HappyShop</h2>", unsafe_allow_html=True)
+        st.markdown(f"<p style='text-align:center;'>User: <b>{st.session_state.user['name']}</b></p>", unsafe_allow_html=True)
         st.markdown("---")
-        st.write("🏠 Dashboard")
-        st.write("📦 GRN")
-        st.write("💸 Expense")
         
-        st.markdown("<div class='menu-header'>Orders</div>", unsafe_allow_html=True)
-        choice = st.radio("Menu", [
+        st.button("🏠 Dashboard", use_container_width=True)
+        st.button("📦 GRN", use_container_width=True)
+        st.button("💸 Expense", use_container_width=True)
+        
+        st.markdown("<div class='menu-header'>ORDERS</div>", unsafe_allow_html=True)
+        choice = st.radio("Nav", [
             "New Order", "Pending Orders", "Order Search", 
             "Import Lead", "View Lead", "Add Lead", 
             "Order History", "Exchanging Orders", "Blacklist Manager"
         ], label_visibility="collapsed")
         
-        st.markdown("<div class='menu-header'>Shipped Items</div>", unsafe_allow_html=True)
-        st.markdown("<div class='menu-header'>Return</div>", unsafe_allow_html=True)
+        st.markdown("<div class='menu-header'>SHIPPED & RETURN</div>", unsafe_allow_html=True)
+        st.button("🚚 Shipped Items", use_container_width=True)
+        st.button("🔄 Return Orders", use_container_width=True)
         
-        if st.button("Log Out", use_container_width=True):
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        if st.button("🚪 Log Out", color="red"):
             st.session_state.user = None
             st.rerun()
 
-    # New Order Form (ඔයා එවපු Screenshot එකේ තියෙන ඔක්කොම Fields මෙතන තියෙනවා)
+    # --- CONTENT AREA (ORDER FORM) ---
     if choice == "New Order":
-        st.markdown(f"## 📝 Customer / Waybill Entry")
-        c1, c2 = st.columns([1.5, 1], gap="large")
+        st.markdown("## 📝 Customer / Waybill Entry")
         
-        with c1:
-            st.markdown("<div class='section-box'><b>Customer Details</b></div>", unsafe_allow_html=True)
-            u_type = st.selectbox("Target User", ["All", "Registered", "Guest"])
-            cust_name = st.text_input("Customer Name *")
-            addr = st.text_area("Address *")
-            city = st.selectbox("Select City *", ["Colombo", "Kandy", "Galle", "Matale"])
-            dist = st.selectbox("Select District *", ["Colombo", "Gampaha", "Kandy", "Matale"])
-            phone1 = st.text_input("Contact Number One *")
-            phone2 = st.text_input("Contact Number Two")
-            o_date = st.date_input("Due Date", value=datetime.now())
-            source = st.selectbox("Order Source", ["FB Lead", "WhatsApp", "Web"])
-            pay_method = st.selectbox("Payment Method", ["COD", "Bank Transfer"])
+        col_main, col_side = st.columns([1.6, 1], gap="large")
+        
+        with col_main:
+            st.markdown("<div class='section-box'><b>👤 Customer Details</b>", unsafe_allow_html=True)
+            st.selectbox("Target User", ["All", "Registered", "Guest"])
+            st.text_input("Customer Name *", placeholder="Enter full name")
+            st.text_area("Address *", placeholder="Enter delivery address")
+            
+            c1, c2 = st.columns(2)
+            c1.selectbox("Select City *", ["Colombo", "Kandy", "Galle", "Matale"])
+            c2.selectbox("Select District *", ["Colombo", "Gampaha", "Kalutara", "Kandy"])
+            
+            p1, p2 = st.columns(2)
+            p1.text_input("Contact Number One *")
+            p2.text_input("Contact Number Two")
+            
+            st.date_input("Due Date", value=datetime.now())
+            st.selectbox("Order Source", ["FB Lead", "WhatsApp", "Web", "Call"])
+            st.selectbox("Payment Method", ["COD (Cash on Delivery)", "Bank Transfer"])
+            st.markdown("</div>", unsafe_allow_html=True)
 
-        with c2:
-            st.markdown("<div class='section-box'><b>Product & Pricing</b></div>", unsafe_allow_html=True)
-            prod = st.selectbox("Select Product *", [
+        with col_side:
+            st.markdown("<div class='section-box'><b>📦 Product & Pricing</b>", unsafe_allow_html=True)
+            st.selectbox("Select Product *", [
                 "Kesharaia Hair Oil [VGLS0005]", 
                 "Herbal Crown: 1 [VGLS0001]", 
                 "Maas Go Capsules [VGLS0006]"
             ])
-            qty = st.number_input("Qty", min_value=1, value=1)
-            amt = st.number_input("Sale Amount (Total Price)", min_value=0.0)
-            note = st.text_area("Product Note")
-            disc = st.number_input("Product Discount", min_value=0.0)
+            st.number_input("Qty", min_value=1, value=1)
+            st.number_input("Sale Amount (LKR)", min_value=0.0)
+            st.text_area("Product Note", height=80)
+            st.number_input("Discount", min_value=0.0)
             
-            st.markdown("<div class='section-box'><b>Courier & Charges</b></div>", unsafe_allow_html=True)
-            courier = st.selectbox("Courier Company", ["Royal Express", "Koombiyo", "Domex"])
-            del_charge = st.number_input("Delivery Charge", min_value=0.0)
+            st.markdown("<b>🚚 Courier Info</b>", unsafe_allow_html=True)
+            st.selectbox("Courier Company", ["Royal Express", "Koombiyo", "Domex"])
+            st.number_input("Delivery Charge", min_value=0.0)
             
-            total = (amt - disc) + del_charge
-            st.write(f"### Total Amount: Rs. {total:,.2f}")
+            st.divider()
+            st.markdown("<h3 style='text-align:right;'>Total: Rs. 0.00</h3>", unsafe_allow_html=True)
             
             if st.button("🚀 SAVE & PROCESS ORDER", use_container_width=True):
-                if cust_name and phone1 and addr:
-                    st.success("Order Saved Successfully!")
-                else:
-                    st.error("Please fill required fields!")
-
+                st.success("Order Saved!")
+            st.markdown("</div>", unsafe_allow_html=True)
     else:
-        st.info(f"{choice} section is currently loading...")
+        st.info(f"The '{choice}' section is coming soon.")
