@@ -2,65 +2,67 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 
-# --- 1. පේජ් එකේ මූලික සැකසුම් (මෙනු එක පේන්නම) ---
+# --- 1. පේජ් සැකසුම් (SIDEBAR එක සැමවිටම පේන්න පවත්වයි) ---
 st.set_page_config(
-    page_title="HappyShop Official ERP", 
-    page_icon="🛒", 
-    layout="wide", 
-    initial_sidebar_state="expanded" 
+    page_title="HappyShop Official ERP",
+    page_icon="🛒",
+    layout="wide",
+    initial_sidebar_state="expanded"  # මේකෙන් තමයි මෙනු එක ස්ථිරවම එළියට දාලා තියන්නේ
 )
 
-# --- 2. CSS STYLING (Hamburger Icon එක සුදු පාටට සහ සයිඩ් බාර් එක ලස්සනට) ---
+# --- 2. CSS STYLING (පින්තූරවල තිබුණු Layout එකම ලබාගැනීමට) ---
 st.markdown("""
     <style>
-    /* මුළු පසුබිම */
+    /* මුළු App එකේම පසුබිම */
     .stApp { background-color: #0d1117; color: white; }
     
-    /* ☰ Hamburger Menu Icon එක සුදු පාට කිරීම - මේක අනිවාර්යයි */
-    [data-testid="stHeader"] button svg {
-        fill: white !important;
-        color: white !important;
-        width: 30px;
-        height: 30px;
-    }
-    
-    /* වම් පැත්තේ Sidebar (මෙනු බාර්) එකේ පෙනුම */
+    /* වම් පැත්තේ Sidebar එකේ පෙනුම */
     [data-testid="stSidebar"] {
         background-color: #001529 !important;
-        min-width: 260px !important;
+        min-width: 250px !important;
     }
     
     /* Sidebar අකුරු සුදු පාට කිරීම */
-    [data-testid="stSidebar"] * {
-        color: white !important;
+    [data-testid="stSidebar"] * { color: white !important; font-size: 16px; }
+
+    /* Hamburger Icon (ඉරි 3) සුදු පාට කිරීම */
+    [data-testid="stHeader"] button svg { fill: white !important; }
+
+    /* මෙනු Header එක (Orange Color) */
+    .menu-header {
+        background-color: #e67e22;
+        padding: 10px;
+        text-align: center;
+        font-weight: bold;
+        border-radius: 5px;
+        margin: 10px 0;
     }
 
-    /* කොටු ලස්සන කිරීම */
+    /* Section Boxes */
     .section-box {
         background-color: #161b22;
         padding: 20px;
         border-radius: 10px;
         border: 1px solid #30363d;
-        border-left: 5px solid #e67e22;
         margin-bottom: 20px;
     }
-
-    /* අනවශ්‍ය දේවල් අයින් කිරීම */
+    
+    /* අනවශ්‍ය Streamlit Label අයින් කිරීම */
     #MainMenu, footer, header {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. දත්ත කළමනාකරණය ---
-if 'orders' not in st.session_state:
-    st.session_state.orders = [
-        {"Date": "2026-02-06", "Name": "Wasantha Bandara", "Contact": "0773411920", "Product": "Kesharaia Hair Oil", "Status": "Pending"}
-    ]
+# --- 3. LOGIN SESSION ---
 if 'user' not in st.session_state:
     st.session_state.user = None
 
-# --- 4. LOGIN SYSTEM ---
-def login_page():
-    st.markdown("<br><br><h1 style='text-align: center; color: #f1c40f;'>HappyShop ERP Login</h1>", unsafe_allow_html=True)
+# --- 4. DATA ---
+if 'orders' not in st.session_state:
+    st.session_state.orders = []
+
+# --- 5. LOGIN VIEW ---
+if st.session_state.user is None:
+    st.markdown("<h1 style='text-align: center; color: #f1c40f;'>HappyShop ERP Login</h1>", unsafe_allow_html=True)
     _, col, _ = st.columns([1, 1.2, 1])
     with col:
         st.markdown("<div class='section-box'>", unsafe_allow_html=True)
@@ -71,61 +73,81 @@ def login_page():
                 st.session_state.user = "Admin"
                 st.rerun()
             else:
-                st.error("Login වැරදියි!")
+                st.error("වැරදියි!")
         st.markdown("</div>", unsafe_allow_html=True)
-
-# --- 5. පද්ධතියේ ප්‍රධාන කොටස ---
-if st.session_state.user is None:
-    login_page()
 else:
-    # --- සයිඩ් බාර් මෙනු එක (SIDEBAR) ---
+    # --- 6. ස්ථිර මෙනු බාර් එක (SIDEBAR MENU) ---
     with st.sidebar:
         st.markdown("<h2 style='text-align:center;'>MANAGER</h2>", unsafe_allow_html=True)
         st.markdown("---")
         
-        # උඹ එවපු හැම මෙනු අයිතමයක්ම මෙතන තියෙනවා
-        choice = st.radio("MAIN MENU", [
+        # උඹ එවපු පින්තූරවල තිබුණු ඒ විදිහටම මෙනු එක
+        main_menu = st.radio("Main Navigation", [
             "🏠 Dashboard", "📦 GRN", "💸 Expense", "🛒 Orders", 
             "🚚 Shipped Items", "🔄 Return", "📊 Stocks", "🏷️ Products"
         ])
+        
+        # එක එක මෙනු එකට අදාළ Sub Options
+        if "Orders" in main_menu:
+            sub_menu = st.selectbox("Order Actions", [
+                "New Order", "Pending Orders", "Order Search", 
+                "Import Lead", "View Lead", "Add Lead", 
+                "Order History", "Exchanging Orders", "Blacklist Manager"
+            ])
+        elif "GRN" in main_menu:
+            sub_menu = st.selectbox("GRN Actions", ["New GRN", "GRN List", "Reorder List", "New PO", "PO List", "Packing"])
+        elif "Shipped" in main_menu:
+            sub_menu = st.selectbox("Shipping Actions", ["Ship", "Shipped List", "Delivery Summary", "Confirm Dispatch"])
+        elif "Stocks" in main_menu:
+            sub_menu = st.selectbox("Stock Actions", ["View Stocks", "Stock Adjustment", "Stock Values"])
+        elif "Products" in main_menu:
+            sub_menu = st.selectbox("Product Actions", ["Create Product", "View Products", "Raw Items"])
+        else:
+            sub_menu = "Home"
 
         st.markdown("<br><br>", unsafe_allow_html=True)
         if st.button("🚪 Log Out", use_container_width=True):
             st.session_state.user = None
             st.rerun()
 
-    # --- මෙනු එකේ තෝරන පේජ් එක අනුව පෙනුම ---
-    if "Orders" in choice:
-        sub = st.selectbox("Order Section", ["New Order", "Order Search", "Pending Orders", "Order History"])
-        
-        if sub == "New Order":
-            st.markdown("## 📝 New Order Entry")
-            c1, c2 = st.columns([2, 1])
-            with c1:
-                st.markdown("<div class='section-box'><b>👤 Customer Details</b><br><br>", unsafe_allow_html=True)
-                name = st.text_input("Customer Name *")
-                phone = st.text_input("Phone Number *")
-                addr = st.text_area("Address *")
-                st.markdown("</div>", unsafe_allow_html=True)
-            with c2:
-                st.markdown("<div class='section-box'><b>📦 Product</b><br><br>", unsafe_allow_html=True)
-                item = st.selectbox("Select Product", ["Kesharaia Hair Oil", "Herbal Crown", "Maas Go"])
-                price = st.number_input("Price", min_value=0.0)
-                if st.button("Save Order", use_container_width=True):
-                    st.session_state.orders.append({"Date": str(datetime.now().date()), "Name": name, "Contact": phone, "Product": item, "Status": "Pending"})
-                    st.success("සාර්ථකව සේව් කළා!")
-                st.markdown("</div>", unsafe_allow_html=True)
-        
-        elif sub == "Order Search":
-            st.markdown("## 🔍 Order Search")
-            q = st.text_input("නම හෝ දුරකථනය ගහන්න")
-            df = pd.DataFrame(st.session_state.orders)
-            st.table(df)
+    # --- 7. පේජ් වල අන්තර්ගතය ---
+    
+    # NEW ORDER PAGE (පින්තූරේ තිබුණු විදිහට)
+    if main_menu == "🛒 Orders" and sub_menu == "New Order":
+        st.markdown("## 📝 New Order Entry")
+        c1, c2 = st.columns([2, 1])
+        with c1:
+            st.markdown("<div class='section-box'><b>👤 Customer Details</b>", unsafe_allow_html=True)
+            st.text_input("Customer Name *")
+            st.text_area("Address *")
+            st.text_input("Phone Number *")
+            st.markdown("</div>", unsafe_allow_html=True)
+        with c2:
+            st.markdown("<div class='section-box'><b>📦 Product & Pricing</b>", unsafe_allow_html=True)
+            st.selectbox("Select Product", ["Kesharaia Hair Oil", "Herbal Crown"])
+            st.number_input("Qty", value=1)
+            st.number_input("Sale Amount", value=0.0)
+            st.button("Save Order", use_container_width=True)
+            st.markdown("</div>", unsafe_allow_html=True)
 
-    elif "Dashboard" in choice:
+    # ORDER SEARCH PAGE (පින්තූරේ තිබුණු විදිහට)
+    elif main_menu == "🛒 Orders" and sub_menu == "Order Search":
+        st.markdown("## 🔍 Order Search")
+        st.markdown("<div class='section-box'>", unsafe_allow_html=True)
+        col1, col2, col3 = st.columns(3)
+        with col1: st.selectbox("User", ["Any", "Admin"])
+        with col2: st.text_input("Customer Name")
+        with col3: st.date_input("Start Date")
+        st.button("Search")
+        st.markdown("</div>", unsafe_allow_html=True)
+        st.info("මෙහි දත්ත සෙවීමේ ප්‍රතිඵල පෙන්වයි.")
+
+    # DASHBOARD
+    elif "Dashboard" in main_menu:
         st.header("🏠 Welcome to Dashboard")
-        st.info("මෙහි දත්ත සාරාංශය පෙන්වයි.")
+        st.info("පද්ධතියේ දත්ත සාරාංශය මෙහි පෙන්වයි.")
 
+    # අනෙකුත් සියලුම පේජ් සඳහා
     else:
-        st.header(choice)
-        st.warning("මෙම කොටස සකස් කරමින් පවතී.")
+        st.header(f"{main_menu} - {sub_menu}")
+        st.warning("මෙම කොටස සඳහා දත්ත ඇතුළත් කරමින් පවතී.")
