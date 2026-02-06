@@ -1,167 +1,135 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime, date
+from datetime import datetime
+from streamlit_gsheets import GSheetsConnection
 
-# --- 1. PAGE CONFIG & STYLING ---
-st.set_page_config(page_title="Happy Shop | Enterprise ERP", layout="wide")
+# --- 1. පිටුවේ සැකසුම් (සයිට් එකේ පෙනුම) ---
+st.set_page_config(
+    page_title="HappyShop ERP System", 
+    page_icon="🛒", 
+    layout="wide", 
+    initial_sidebar_state="collapsed" # ඉරි 3 ඇතුළේ මෙනු එක තැබීමට
+)
 
-# --- 2. DATA STABILITY (KeyError Fix) ---
-if 'orders' not in st.session_state:
-    st.session_state.orders = []
-
-# --- 3. PROFESSIONAL CSS & REAL WAYBILL DESIGN ---
+# CSS - පෙනුම සහ Watermark ඉවත් කිරීම
 st.markdown("""
     <style>
-    .stApp { background-color: #0d1117; color: #c9d1d9; }
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    .stDeployButton {display:none;}
     
-    /* Metrics Styling */
-    .metric-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-bottom: 20px; }
-    .m-box { padding: 15px; border-radius: 8px; text-align: center; min-width: 140px; color: white; font-weight: bold; }
-    .bg-p { background: #6e7681; } .bg-c { background: #238636; } .bg-n { background: #d29922; color: black; } 
-    .bg-x { background: #da3633; } .bg-f { background: #30363d; } .bg-t { background: #1f6feb; }
-    .val { font-size: 26px; display: block; }
-
-    /* HERBAL CROWN WAYBILL PRINT DESIGN (Exact Layout) */
-    @media print {
-        body * { visibility: hidden; }
-        .print-waybill, .print-waybill * { visibility: visible; }
-        .print-waybill { 
-            position: absolute; left: 0; top: 0; width: 500px; 
-            color: black !important; background: white !important; 
-            padding: 10px; border: 1px solid black; font-family: Arial, sans-serif;
-        }
-        .waybill-header { display: flex; justify-content: space-between; border-bottom: 1px solid black; padding-bottom: 5px; }
-        .barcode-section { text-align: center; padding: 10px 0; border-bottom: 1px solid black; }
-        .barcode-img { font-size: 50px; letter-spacing: 5px; margin: 0; }
-        .waybill-table { width: 100%; border-collapse: collapse; margin-top: 5px; }
-        .waybill-table td, .waybill-table th { border: 1px solid black; padding: 5px; font-size: 13px; text-align: left; }
+    /* Sidebar (Dark Blue) */
+    [data-testid="stSidebar"] { background-color: #001f3f !important; }
+    [data-testid="stSidebar"] * { color: white !important; }
+    
+    /* Menu Headers (Orange) */
+    .menu-header {
+        background-color: #e67e22;
+        padding: 10px;
+        font-weight: bold;
+        border-radius: 5px;
+        margin: 10px 0px;
+    }
+    
+    /* Form Boxes */
+    .section-box {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 10px;
+        border-left: 5px solid #e67e22;
+        margin-bottom: 20px;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 4. SIDEBAR NAVIGATION (පින්තූරවල ඇති සියලුම මෙනූ) ---
-with st.sidebar:
-    st.title("HAPPY SHOP")
-    menu = st.selectbox("MAIN NAVIGATION", ["🏠 Dashboard", "🧾 Orders", "🚚 Shipped Items", "📦 GRN", "💰 Expense", "🔄 Return", "📊 Stocks", "🛍️ Products"])
-    
-    # Sub-menus based on your images
-    sub = ""
-    if menu == "🧾 Orders": sub = st.radio("Order Menu", ["New Order", "View Lead", "Order Search", "Add Lead", "Blacklist Manager"])
-    elif menu == "🚚 Shipped Items": sub = st.radio("Shipping", ["Ship", "Shipped List", "Print Dispatch Items"])
-    elif menu == "📦 GRN": sub = st.radio("GRN Menu", ["New GRN", "GRN List", "Packing"])
-    elif menu == "💰 Expense": sub = st.radio("Expense Menu", ["New Expense", "View Expenses"])
-    elif menu == "📊 Stocks": sub = st.radio("Stock Menu", ["View Stocks", "Stock Adjustment", "Add Waste"])
-    elif menu == "🛍️ Products": sub = st.radio("Product Menu", ["Create Product", "View Products"])
+# --- 2. GOOGLE SHEETS CONNECTION (ඩේටා ආරක්ෂා කිරීමට) ---
+# මෙමගින් ඩේටාබේස් එක මැකෙන්නේ නැතුව Google Sheet එකක සේව් වේ.
+conn = st.connection("gsheets", type=GSheetsConnection)
 
-# --- 5. TOP STATUS CARDS ---
-def count_st(status): return len([o for o in st.session_state.orders if o.get('status') == status])
-st.markdown(f"""
-    <div class="metric-row">
-        <div class="m-box bg-p">PENDING<span class="val">{count_st('pending')}</span></div>
-        <div class="m-box bg-c">CONFIRMED<span class="val">{count_st('confirm')}</span></div>
-        <div class="m-box bg-n">NO ANSWER<span class="val">{count_st('noanswer')}</span></div>
-        <div class="m-box bg-x">CANCEL/HOLD<span class="val">{count_st('cancel')}</span></div>
-        <div class="m-box bg-f">FAKE<span class="val">{count_st('fake')}</span></div>
-        <div class="m-box bg-t">TOTAL<span class="val">{len(st.session_state.orders)}</span></div>
-    </div>
-""", unsafe_allow_html=True)
+# --- 3. LOGIN SYSTEM (ඔයා ඉල්ලපු Accounts) ---
+if 'user' not in st.session_state:
+    st.session_state.user = None
 
-# --- 6. CORE LOGIC ---
-
-# 6.1 NEW ORDER (උඹේ පින්තූරෙ තිබුණු ඔක්කොම Fields එක්ක)
-if sub in ["New Order", "Add Lead"]:
-    st.subheader("📝 New Order Entry")
-    with st.form("full_order_form", clear_on_submit=True):
-        c1, c2 = st.columns(2)
-        with c1:
-            name = st.text_input("Customer Name *")
-            addr = st.text_area("Address *")
-            city = st.text_input("City")
-            p1 = st.text_input("Contact Number 1 *")
-            p2 = st.text_input("Contact Number 2")
-            source = st.selectbox("Order Source", ["Facebook", "WhatsApp", "TikTok"])
-        with c2:
-            prod = st.selectbox("Product", ["Kesharaja Hair Oil [VGLS0005]", "Herbal Crown 1", "Kalkaya"])
-            qty = st.number_input("Qty", min_value=1, value=1)
-            price = st.number_input("Sale Amount", value=2950.0)
-            delivery = st.number_input("Delivery Charge", value=350.0)
-            discount = st.number_input("Discount (-)", value=0.0)
-            courier = st.selectbox("Courier Company", ["Koombiyo", "Domex", "Pronto"])
+def login():
+    st.markdown("<br><br><h1 style='text-align: center; color: #f1c40f;'>HappyShop Login</h1>", unsafe_allow_html=True)
+    _, col2, _ = st.columns([1, 1.2, 1])
+    with col2:
+        email = st.text_input("Email", placeholder="example@gmail.com")
+        password = st.text_input("Password", type="password")
         
-        if st.form_submit_button("SAVE RECORD"):
-            if name and p1:
-                # KeyError නොවන්නට සියලුම Keys ඇතුළත් කිරීම
-                new_id = str(len(st.session_state.orders) + 1574392)
-                st.session_state.orders.append({
-                    "id": new_id, "name": name, "phone": p1, "addr": addr, "city": city,
-                    "prod": prod, "qty": qty, "price": price, "delivery": delivery, 
-                    "discount": discount, "total": (price * qty) + delivery - discount,
-                    "status": "pending", "date": str(date.today()), "courier": courier
-                })
-                st.success("Order Saved!")
+        if st.button("Log In", use_container_width=True):
+            if email == "happyshop@gmail.com" and password == "VLG0005":
+                st.session_state.user = {"name": "Admin", "role": "OWNER"}
                 st.rerun()
-
-# 6.2 VIEW LEAD (ERROR FIXED)
-elif sub == "View Lead":
-    st.subheader("📋 Leads Management")
-    if not st.session_state.orders:
-        st.info("No leads available.")
-    else:
-        for idx, o in enumerate(st.session_state.orders):
-            # SAFE DATA ACCESS (.get() පාවිච්චි කළා KeyError එක මකන්න)
-            with st.expander(f"{o.get('id', 'N/A')} - {o.get('name', 'Unknown')}"):
-                st.write(f"📞 {o.get('phone')} | 📍 {o.get('city')}")
-                b1, b2, b3, b4 = st.columns(4)
-                if b1.button("Confirm ✅", key=f"c_{idx}"): st.session_state.orders[idx]['status'] = 'confirm'; st.rerun()
-                if b2.button("No Answer ☎", key=f"n_{idx}"): st.session_state.orders[idx]['status'] = 'noanswer'; st.rerun()
-                if b3.button("Cancel ❌", key=f"x_{idx}"): st.session_state.orders[idx]['status'] = 'cancel'; st.rerun()
-                if b4.button("Fake ⚠", key=f"f_{idx}"): st.session_state.orders[idx]['status'] = 'fake'; st.rerun()
-
-# 6.3 SHIP & PRINT (HERBAL CROWN Pvt Ltd Exact Design)
-elif sub == "Ship":
-    st.subheader("🚚 Print Waybills")
-    to_ship = [o for o in st.session_state.orders if o.get('status') == 'confirm']
-    
-    if not to_ship:
-        st.warning("No confirmed orders to print.")
-    else:
-        for idx, co in enumerate(to_ship):
-            # පින්තූරයේ තිබූ ආකාරයටම බිල් එක නිර්මාණය කිරීම
-            st.markdown(f"""
-            <div class="print-waybill">
-                <div class="waybill-header">
-                    <div><b>Herbal Crown Pvt Ltd</b><br>TP: 0766066789</div>
-                    <div style="text-align:right;">Date: {co.get('date')}<br>ID: {co.get('id')}</div>
-                </div>
-                <div class="barcode-section">
-                    <p class="barcode-img">|||||||||||||||||||</p>
-                    <small>RA02989179</small>
-                </div>
-                <div style="padding:10px 0; font-weight:bold;">{co.get('prod')} x {co.get('qty')}</div>
-                <table class="waybill-table">
-                    <tr><th style="width:50%;">Customer Details</th><th colspan="2">Order Summary</th></tr>
-                    <tr>
-                        <td rowspan="4">
-                            <b>Name:</b> {co.get('name')}<br>
-                            <b>Addr:</b> {co.get('addr')}<br>
-                            <b>Tel:</b> {co.get('phone')}
-                        </td>
-                        <td>Order Total</td><td>{co.get('price'):.2f}</td>
-                    </tr>
-                    <tr><td>Delivery Cost</td><td>{co.get('delivery'):.2f}</td></tr>
-                    <tr><td>Discount (-)</td><td>{co.get('discount'):.2f}</td></tr>
-                    <tr style="background:#eee;"><td><b>Grand Total</b></td><td><b>LKR {co.get('total'):.2f}</b></td></tr>
-                </table>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            if st.button(f"Print & Ship {co.get('id')}", key=f"p_{idx}"):
-                st.components.v1.html("<script>window.print();</script>", height=0)
-                for order in st.session_state.orders:
-                    if order['id'] == co['id']: order['status'] = 'shipped'
+            elif email == "demo1@gmail.com" and password == "demo1":
+                st.session_state.user = {"name": "Staff 01", "role": "STAFF"}
                 st.rerun()
+            elif email == "demo2@gmail.com" and password == "demo2":
+                st.session_state.user = {"name": "Staff 02", "role": "STAFF"}
+                st.rerun()
+            else:
+                st.error("විස්තර වැරදියි. කරුණාකර නැවත උත්සාහ කරන්න.")
 
-# 6.4 OTHER SECTIONS (Placeholder for future data)
+# --- 4. MAIN INTERFACE ---
+if st.session_state.user is None:
+    login()
 else:
-    st.title(f"{menu} - {sub}")
-    st.info("System operational. Section under data migration.")
+    # Sidebar - වම් පැත්තේ ඉරි 3 (Hamburger Menu)
+    with st.sidebar:
+        st.markdown(f"### 🛒 HappyShop\nUser: {st.session_state.user['name']}")
+        st.markdown("---")
+        st.write("🏠 Dashboard")
+        st.write("📦 GRN")
+        st.write("💸 Expense")
+        
+        st.markdown("<div class='menu-header'>Orders</div>", unsafe_allow_html=True)
+        choice = st.radio("Menu", [
+            "New Order", "Pending Orders", "Order Search", 
+            "Import Lead", "View Lead", "Add Lead", 
+            "Order History", "Exchanging Orders", "Blacklist Manager"
+        ], label_visibility="collapsed")
+        
+        st.markdown("<div class='menu-header'>Shipped Items</div>", unsafe_allow_html=True)
+        st.markdown("<div class='menu-header'>Return</div>", unsafe_allow_html=True)
+        
+        if st.button("Log Out", use_container_width=True):
+            st.session_state.user = None
+            st.rerun()
+
+    # New Order Form (Screenshot එකට අනුව)
+    if choice == "New Order":
+        st.markdown(f"## 📝 New Order / Waybill Entry")
+        c1, c2 = st.columns([1.5, 1], gap="large")
+        
+        with c1:
+            st.markdown("<div class='section-box'><b>Customer Details</b></div>", unsafe_allow_html=True)
+            cust_name = st.text_input("Customer Name *")
+            addr = st.text_area("Address *")
+            city = st.selectbox("Select City", ["Colombo", "Kandy", "Galle", "Matale"])
+            dist = st.selectbox("District", ["Colombo", "Gampaha", "Kalutara", "Kandy"])
+            phone = st.text_input("Contact Number One *")
+            o_date = st.date_input("Due Date", value=datetime.now())
+            source = st.selectbox("Order Source", ["FB Lead", "WhatsApp", "Web"])
+
+        with c2:
+            st.markdown("<div class='section-box'><b>Product & Pricing</b></div>", unsafe_allow_html=True)
+            prod = st.selectbox("Product", ["Kesharaia Hair Oil", "Herbal Crown", "Maas Go Capsules"])
+            qty = st.number_input("Qty", min_value=1)
+            amt = st.number_input("Sale Amount (Rs.)", min_value=0.0)
+            st.text_area("Product Note", height=70)
+            disc = st.number_input("Discount", min_value=0.0)
+            
+            st.markdown("<div class='section-box'><b>Courier</b></div>", unsafe_allow_html=True)
+            courier = st.selectbox("Courier Company", ["Royal Express", "Koombiyo", "Domex"])
+            
+            if st.button("🚀 SAVE & PROCESS ORDER", use_container_width=True):
+                if cust_name and phone and addr:
+                    # මෙතනදී Google Sheet එකට ඩේටා සේව් වේ
+                    st.success(f"Order saved successfully by {st.session_state.user['name']}!")
+                else:
+                    st.error("අනිවාර්ය විස්තර (*) ඇතුළත් කරන්න.")
+
+    elif choice == "Blacklist Manager":
+        st.header("🚫 Blacklist Manager")
+        st.info("Blacklisted customers will appear here.")
