@@ -2,130 +2,158 @@ import streamlit as st
 import pandas as pd
 import sqlite3
 import hashlib
+import requests
 from datetime import datetime
 
-# --- 1. DATA ENGINE ---
-class HappyShopEngine:
+# --- 1. ENGINE & DATA ARCHITECTURE ---
+class HappyShopPro:
     def __init__(self):
-        self.conn = sqlite3.connect('happyshop_leads.db', check_same_thread=False)
+        self.conn = sqlite3.connect('happyshop_enterprise_v4.db', check_same_thread=False)
         self.init_db()
 
     def init_db(self):
         c = self.conn.cursor()
-        # Leads Table
-        c.execute('''CREATE TABLE IF NOT EXISTS leads (
+        # Leads & Delivery Table
+        c.execute('''CREATE TABLE IF NOT EXISTS orders (
             id INTEGER PRIMARY KEY AUTOINCREMENT, 
-            name TEXT, phone TEXT, product TEXT, status TEXT, time TEXT)''')
-        # Users Table
-        c.execute('''CREATE TABLE IF NOT EXISTS users (
-            email TEXT UNIQUE, password TEXT, role TEXT)''')
+            customer_name TEXT, phone TEXT, address TEXT, city TEXT, 
+            item_name TEXT, selling_price REAL, cost_price REAL, 
+            status TEXT, tracking_id TEXT, staff_id TEXT, date TEXT)''')
+        # User Management Table
+        c.execute('''CREATE TABLE IF NOT EXISTS users (email TEXT UNIQUE, password TEXT, role TEXT)''')
         
-        # Owner Account Seed (ඔයා ඉල්ලපු විදියට)
-        owner_email = "happyshop@gmail.com"
+        # Super Admin (Owner)
         owner_pass = hashlib.sha256("VLG0005".encode()).hexdigest()
-        c.execute("INSERT OR IGNORE INTO users VALUES (?, ?, 'OWNER')", (owner_email, owner_pass))
+        c.execute("INSERT OR IGNORE INTO users VALUES (?, ?, 'OWNER')", ("happyshop@gmail.com", owner_pass))
         self.conn.commit()
 
-db = HappyShopEngine()
+db = HappyShopPro()
 
-# --- 2. THEME & UI ---
-st.set_page_config(page_title="HappyShop Lead Manager", layout="wide")
+# --- 2. THEME & STYLING ---
+st.set_page_config(page_title="HappyShop Enterprise", layout="wide")
 st.markdown("""
 <style>
-    .stApp { background: #0d1117; color: #c9d1d9; }
-    .lead-card { background: #161b22; border: 1px solid #30363d; padding: 20px; border-radius: 12px; margin-bottom: 15px; border-left: 6px solid #1877F2; }
-    .owner-card { background: #161b22; padding: 20px; border-radius: 10px; border: 1px solid #238636; text-align: center; }
+    .stApp { background-color: #0d1117; color: #c9d1d9; }
+    .main-header { color: #ffcc00; font-size: 30px; font-weight: bold; border-bottom: 2px solid #30363d; margin-bottom: 20px; }
+    .stat-card { background: #161b22; border: 1px solid #30363d; padding: 20px; border-radius: 10px; text-align: center; }
+    .order-card { background: #1c2128; border-left: 5px solid #ffcc00; padding: 15px; border-radius: 8px; margin-bottom: 10px; }
+    .stButton>button { background-color: #238636 !important; color: white !important; border: none; width: 100%; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 3. OWNER DASHBOARD ---
-def owner_panel():
-    st.title("👨‍💼 HappyShop Owner Dashboard")
-    
-    t1, t2, t3 = st.tabs(["📊 Analytics", "👥 Manage Staff", "📝 All Leads"])
-    
-    with t1:
-        col1, col2, col3 = st.columns(3)
-        total = pd.read_sql("SELECT count(*) FROM leads", db.conn).iloc[0,0]
-        conf = pd.read_sql("SELECT count(*) FROM leads WHERE status='Confirmed'", db.conn).iloc[0,0]
-        
-        col1.markdown(f"<div class='owner-card'><h3>Total Leads</h3><h1>{total}</h1></div>", unsafe_allow_html=True)
-        col2.markdown(f"<div class='owner-card' style='border-color:#1877F2'><h3>Confirmed</h3><h1>{conf}</h1></div>", unsafe_allow_html=True)
-        col3.markdown(f"<div class='owner-card' style='border-color:#d73a49'><h3>Pending</h3><h1>{total-conf}</h1></div>", unsafe_allow_html=True)
+# --- 3. CORE FUNCTIONS ---
+def get_profit_stats():
+    df = pd.read_sql("SELECT * FROM orders WHERE status='Delivered'", db.conn)
+    if df.empty: return 0, 0
+    total_revenue = df['selling_price'].sum()
+    total_cost = df['cost_price'].sum()
+    return total_revenue, (total_revenue - total_cost)
 
-    with t2:
-        st.subheader("Create New Staff Account")
-        with st.form("add_staff"):
-            s_email = st.text_input("Staff Email")
-            s_pass = st.text_input("Staff Password", type="password")
-            if st.form_submit_button("Create Account"):
-                h_pass = hashlib.sha256(s_pass.encode()).hexdigest()
+# --- 4. OWNER PANEL ---
+def owner_view():
+    st.markdown("<div class='main-header'>👑 OWNER MASTER CONSOLE</div>", unsafe_allow_html=True)
+    
+    # Analytics Row
+    rev, profit = get_profit_stats()
+    c1, c2, c3, c4 = st.columns(4)
+    c1.markdown(f"<div class='stat-card'><h4>Total Revenue</h4><h2>Rs.{rev:,.0f}</h2></div>", unsafe_allow_html=True)
+    c2.markdown(f"<div class='stat-card'><h4>Net Profit</h4><h2 style='color:#238636'>Rs.{profit:,.0f}</h2></div>", unsafe_allow_html=True)
+    
+    leads_count = pd.read_sql("SELECT count(*) FROM orders WHERE status='New'", db.conn).iloc[0,0]
+    c3.markdown(f"<div class='stat-card'><h4>Pending Leads</h4><h2>{leads_count}</h2></div>", unsafe_allow_html=True)
+    
+    shipped_count = pd.read_sql("SELECT count(*) FROM orders WHERE status='Shipped'", db.conn).iloc[0,0]
+    c4.markdown(f"<div class='stat-card'><h4>In Transit</h4><h2>{shipped_count}</h2></div>", unsafe_allow_html=True)
+
+    st.divider()
+    
+    t1, t2 = st.tabs(["👥 Staff Control", "📜 Master Database"])
+    with t1:
+        st.subheader("Add New Staff Member")
+        with st.form("staff_reg"):
+            s_em = st.text_input("Staff Email")
+            s_pw = st.text_input("Temporary Password")
+            if st.form_submit_button("Register Staff"):
+                h_pw = hashlib.sha256(s_pw.encode()).hexdigest()
                 try:
-                    db.conn.cursor().execute("INSERT INTO users VALUES (?,?, 'STAFF')", (s_email, h_pass))
-                    db.conn.commit()
-                    st.success(f"Staff account for {s_email} created!")
+                    db.conn.cursor().execute("INSERT INTO users VALUES (?,?,'STAFF')", (s_em, h_pw))
+                    db.conn.commit(); st.success("Staff member added!")
                 except: st.error("Email already exists!")
 
-    with t3:
-        all_leads = pd.read_sql("SELECT * FROM leads ORDER BY id DESC", db.conn)
-        st.dataframe(all_leads, use_container_width=True)
+    with t2:
+        st.subheader("All Orders (Live History)")
+        all_df = pd.read_sql("SELECT * FROM orders ORDER BY id DESC", db.conn)
+        st.dataframe(all_df, use_container_width=True)
 
-# --- 4. STAFF DASHBOARD ---
-def staff_panel():
-    st.title("🎧 Staff Processing Hub")
+# --- 5. STAFF PANEL ---
+def staff_view():
+    st.markdown("<div class='main-header'>📦 DISPATCH & PROCESSING HUB</div>", unsafe_allow_html=True)
     
-    # Facebook එකෙන් දත්ත එන තැන (Manual Entry for Testing)
-    with st.expander("➕ Add Lead Manually (Testing)"):
-        with st.form("test_lead"):
-            n = st.text_input("Customer Name")
-            p = st.text_input("Phone Number")
-            pr = st.text_input("Product")
-            if st.form_submit_button("Add to System"):
-                db.conn.cursor().execute("INSERT INTO leads (name, phone, product, status, time) VALUES (?,?,?,?,?)",
-                                        (n, p, pr, 'New', datetime.now().strftime("%Y-%m-%d %H:%M")))
-                db.conn.commit(); st.rerun()
-
-    st.subheader("New Facebook Leads")
-    new_leads = pd.read_sql("SELECT * FROM leads WHERE status='New' ORDER BY id DESC", db.conn)
+    # Section: Confirmed Orders for Royal Dispatch
+    st.subheader("🚀 Orders Ready for Royal Express")
+    ready_df = pd.read_sql("SELECT * FROM orders WHERE status='Confirmed'", db.conn)
     
-    if new_leads.empty:
-        st.info("No new leads to process.")
+    if ready_df.empty:
+        st.info("No orders ready for dispatch at the moment.")
     
-    for i, row in new_leads.iterrows():
-        st.markdown(f"""<div class='lead-card'>
-            <b style='color:#58a6ff;'>NEW FACEBOOK LEAD</b><br>
-            <h3 style='margin:5px 0;'>{row['name']}</h3>
-            <b>Phone:</b> {row['phone']} | <b>Product:</b> {row['product']}<br>
-            <small>Received: {row['time']}</small>
-        </div>""", unsafe_allow_html=True)
-        
-        c1, c2 = st.columns([1, 4])
-        if c1.button("✅ Confirm Order", key=f"c_{row['id']}"):
-            db.conn.cursor().execute("UPDATE leads SET status='Confirmed' WHERE id=?", (row['id'],))
-            db.conn.commit(); st.rerun()
-
-# --- 5. LOGIN LOGIC ---
-if 'auth' not in st.session_state: st.session_state.auth = None
-
-if not st.session_state.auth:
-    _, center, _ = st.columns([1, 1.2, 1])
-    with center:
-        st.title("HappyShop Login")
-        login_em = st.text_input("Email")
-        login_pw = st.text_input("Password", type="password")
-        if st.button("Access System"):
-            h_pw = hashlib.sha256(login_pw.encode()).hexdigest()
-            res = db.conn.cursor().execute("SELECT role FROM users WHERE email=? AND password=?", (login_em, h_pw)).fetchone()
-            if res:
-                st.session_state.auth = {"email": login_em, "role": res[0]}
+    for i, row in ready_df.iterrows():
+        with st.container():
+            st.markdown(f"""<div class='order-card'>
+                <b>ORDER #{row['id']}</b> | Customer: {row['customer_name']} | 📍 {row['city']}<br>
+                <b>Product:</b> {row['item_name']} | <b>COD Amount:</b> Rs.{row['selling_price']}
+            </div>""", unsafe_allow_html=True)
+            
+            if st.button(f"Generate Waybill & Dispatch to Royal", key=f"btn_{row['id']}"):
+                # රෝයල් එකට ඩේටා යවන තැන (Simulation)
+                fake_tracking = f"RE-CONF-{row['id']}778"
+                db.conn.cursor().execute(
+                    "UPDATE orders SET status='Shipped', tracking_id=? WHERE id=?", 
+                    (fake_tracking, row['id'])
+                )
+                db.conn.commit()
+                st.success(f"Success! Waybill Generated: {fake_tracking}")
                 st.rerun()
-            else: st.error("Invalid Credentials!")
+
+    st.divider()
+    # Section: Lead Entry (Manual/Sync)
+    with st.expander("📝 Manual Lead Entry (Facebook Ad Data)"):
+        with st.form("new_lead"):
+            c1, c2 = st.columns(2)
+            n = c1.text_input("Customer Name")
+            p = c2.text_input("Phone Number")
+            addr = st.text_area("Address")
+            cty = st.text_input("City")
+            itm = st.text_input("Item Name")
+            sp = st.number_input("Selling Price (COD)", value=0.0)
+            cp = st.number_input("Item Cost", value=0.0)
+            
+            if st.form_submit_button("Save & Confirm Later"):
+                db.conn.cursor().execute(
+                    "INSERT INTO orders (customer_name, phone, address, city, item_name, selling_price, cost_price, status, date) VALUES (?,?,?,?,?,?,?,?,?)",
+                    (n, p, addr, cty, itm, sp, cp, 'New', datetime.now().strftime("%Y-%m-%d")))
+                db.conn.commit(); st.success("Lead saved to Pending List!")
+
+# --- 6. AUTHENTICATION ---
+if 'user' not in st.session_state: st.session_state.user = None
+
+if not st.session_state.user:
+    _, col, _ = st.columns([1, 1.2, 1])
+    with col:
+        st.image("https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR6A3C2F98C0XF_CqMToO6_m-Fv0SjYw5Xpog&s", width=100) # Royal Express Style Logo
+        st.title("HappyShop Login")
+        e_in = st.text_input("Email")
+        p_in = st.text_input("Password", type="password")
+        if st.button("Login"):
+            hp = hashlib.sha256(p_in.encode()).hexdigest()
+            res = db.conn.cursor().execute("SELECT role FROM users WHERE email=? AND password=?", (e_in, hp)).fetchone()
+            if res:
+                st.session_state.user = {"email": e_in, "role": res[0]}
+                st.rerun()
+            else: st.error("Access Denied!")
 else:
     if st.sidebar.button("Logout"):
-        st.session_state.auth = None
+        st.session_state.user = None
         st.rerun()
     
-    if st.session_state.auth['role'] == "OWNER":
-        owner_panel()
-    else:
-        staff_panel()
+    if st.session_state.user['role'] == "OWNER": owner_view()
+    else: staff_view()
