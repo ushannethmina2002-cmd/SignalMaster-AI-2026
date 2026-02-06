@@ -2,24 +2,36 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, date
 import uuid
+import os
+import plotly.express as px  # Analytics සඳහා
+
+# --- 0. DATA PERSISTENCE (CSV ලොජික් එක) ---
+def save_data(df, filename):
+    df.to_csv(filename, index=False)
+
+def load_data(filename, columns):
+    if os.path.exists(filename):
+        return pd.read_csv(filename).to_dict('records')
+    return []
 
 # --- 1. PAGE CONFIGURATION ---
 st.set_page_config(page_title="Happy Shop | Full Enterprise ERP", layout="wide", initial_sidebar_state="expanded")
 
-# --- 2. SESSION STATE (Data Stability) ---
+# --- 2. SESSION STATE (යාවත්කාලීන කරන ලද දත්ත පද්ධතිය) ---
 if 'orders' not in st.session_state:
-    st.session_state.orders = []
+    st.session_state.orders = load_data('orders.csv', [])
 if 'stocks' not in st.session_state:
-    st.session_state.stocks = {"Kesharaja Hair Oil [VGLS0005]": 100, "Crown 1": 50, "Kalkaya": 75}
+    # ස්ටොක් එක dictionary එකක් නිසා වෙනම ලෝඩ් කරමු
+    if os.path.exists('stocks.csv'):
+        df_s = pd.read_csv('stocks.csv')
+        st.session_state.stocks = dict(zip(df_s.Item, df_s.Qty))
+    else:
+        st.session_state.stocks = {"Kesharaja Hair Oil [VGLS0005]": 100, "Crown 1": 50, "Kalkaya": 75}
+
 if 'expenses' not in st.session_state:
-    st.session_state.expenses = []
+    st.session_state.expenses = load_data('expenses.csv', [])
 if 'grn_history' not in st.session_state:
-    st.session_state.grn_history = []
-if 'products' not in st.session_state:
-    st.session_state.products = [
-        {"code": "VGLS0005", "name": "Kesharaja Hair Oil [VGLS0005]", "price": 2950.0},
-        {"code": "C1", "name": "Crown 1", "price": 3500.0}
-    ]
+    st.session_state.grn_history = load_data('grn.csv', [])
 if 'authenticated' not in st.session_state:
     st.session_state.authenticated = False
 
@@ -72,8 +84,13 @@ with st.sidebar:
     elif menu == "📦 GRN": sub = st.radio("GRN Menu", ["New GRN", "GRN List"])
     elif menu == "📊 Stocks": sub = st.radio("Stock Menu", ["View Stocks", "Adjustment"])
 
-# --- 6. DASHBOARD (Metrics & Financials) ---
+# --- 6. DASHBOARD (Metrics & Analytics) ---
 if menu == "🏠 Dashboard":
+    # Low Stock Alert Check
+    low_stock_items = [item for item, qty in st.session_state.stocks.items() if qty < 10]
+    if low_stock_items:
+        st.error(f"⚠️ **Low Stock Alert:** {', '.join(low_stock_items)} are running low!")
+
     def get_count(s): return len([o for o in st.session_state.orders if o.get('status') == s])
     st.markdown(f"""
         <div class="metric-container">
@@ -95,11 +112,22 @@ if menu == "🏠 Dashboard":
     c2.metric("Total Expenses", f"LKR {total_exp:,.2f}")
     c3.metric("Net Profit", f"LKR {total_rev - total_exp:,.2f}")
 
+    # --- Charts (Analytics) ---
     if st.session_state.orders:
-        df = pd.DataFrame(st.session_state.orders)
-        st.download_button("📥 Export Orders (CSV)", df.to_csv(index=False).encode('utf-8'), "happy_shop_orders.csv")
+        df_orders = pd.DataFrame(st.session_state.orders)
+        col_chart1, col_chart2 = st.columns(2)
+        
+        with col_chart1:
+            st.write("**Sales by District**")
+            fig1 = px.pie(df_orders, names='dist', hole=0.4)
+            st.plotly_chart(fig1, use_container_width=True)
+            
+        with col_chart2:
+            st.write("**Order Status Distribution**")
+            fig2 = px.bar(df_orders, x='status', color='status')
+            st.plotly_chart(fig2, use_container_width=True)
 
-# --- 7. ORDERS (View Lead & Tracking Integrated) ---
+# --- 7. ORDERS (View Lead & Tracking) ---
 elif menu == "🧾 Orders":
     if sub in ["New Order", "Add Lead"]:
         st.subheader(f"📝 {sub}")
@@ -110,7 +138,7 @@ elif menu == "🧾 Orders":
                 phone = st.text_input("Contact Number 1 *")
                 addr = st.text_area("Address *")
                 city = st.text_input("City")
-                district = st.selectbox("District", ["Colombo", "Gampaha", "Kandy", "Galle", "Other"])
+                district = st.selectbox("District", ["Colombo", "Gampaha", "Kandy", "Galle", "Kalutara", "Kurunegala", "Other"])
             with c2:
                 prod = st.selectbox("Product", list(st.session_state.stocks.keys()))
                 qty = st.number_input("Qty", min_value=1, value=1)
@@ -126,37 +154,54 @@ elif menu == "🧾 Orders":
                     "prod": prod, "qty": qty, "price": price, "delivery": delivery, "discount": discount,
                     "total": (price * qty) + delivery - discount, "status": "pending", "date": str(date.today()), "courier": courier
                 })
+                save_data(pd.DataFrame(st.session_state.orders), 'orders.csv')
                 st.success(f"Order {oid} Saved!")
 
     elif sub == "View Lead":
         st.subheader("📋 Lead List")
+        # Search & Filter
+        search_q = st.text_input("🔍 Search by Name or Phone")
+        filter_status = st.multiselect("Filter Status", ["pending", "confirm", "noanswer", "cancel", "fake"], default=["pending", "confirm"])
+        
         for idx, o in enumerate(st.session_state.orders):
-            with st.expander(f"{o['id']} - {o['name']} ({o['status'].upper()})"):
-                st.write(f"📞 {o['phone']} | 📍 {o['addr']}, {o['city']}")
-                cols = st.columns(5)
-                if cols[0].button("Confirm ✅", key=f"c{idx}"): st.session_state.orders[idx]['status'] = 'confirm'; st.rerun()
-                if cols[1].button("No Answer ☎", key=f"n{idx}"): st.session_state.orders[idx]['status'] = 'noanswer'; st.rerun()
-                if cols[2].button("Cancel ❌", key=f"x{idx}"): st.session_state.orders[idx]['status'] = 'cancel'; st.rerun()
-                if cols[3].button("Fake ⚠️", key=f"f{idx}"): st.session_state.orders[idx]['status'] = 'fake'; st.rerun()
-                if cols[4].button("Delete 🗑️", key=f"d{idx}"): st.session_state.orders.pop(idx); st.rerun()
+            if (search_q.lower() in o['name'].lower() or search_q in o['phone']) and (o['status'] in filter_status):
+                with st.expander(f"{o['id']} - {o['name']} ({o['status'].upper()})"):
+                    st.write(f"📞 {o['phone']} | 📍 {o['addr']}, {o['city']}")
+                    cols = st.columns(5)
+                    if cols[0].button("Confirm ✅", key=f"c{idx}"): 
+                        st.session_state.orders[idx]['status'] = 'confirm'
+                        save_data(pd.DataFrame(st.session_state.orders), 'orders.csv'); st.rerun()
+                    if cols[1].button("No Answer ☎", key=f"n{idx}"): 
+                        st.session_state.orders[idx]['status'] = 'noanswer'
+                        save_data(pd.DataFrame(st.session_state.orders), 'orders.csv'); st.rerun()
+                    if cols[2].button("Cancel ❌", key=f"x{idx}"): 
+                        st.session_state.orders[idx]['status'] = 'cancel'
+                        save_data(pd.DataFrame(st.session_state.orders), 'orders.csv'); st.rerun()
+                    if cols[3].button("Fake ⚠️", key=f"f{idx}"): 
+                        st.session_state.orders[idx]['status'] = 'fake'
+                        save_data(pd.DataFrame(st.session_state.orders), 'orders.csv'); st.rerun()
+                    if cols[4].button("Delete 🗑️", key=f"d{idx}"): 
+                        st.session_state.orders.pop(idx)
+                        save_data(pd.DataFrame(st.session_state.orders), 'orders.csv'); st.rerun()
 
     elif sub == "Order Tracking":
         search = st.text_input("Search by Phone Number")
         if search:
             results = [o for o in st.session_state.orders if search in o['phone']]
-            for r in results:
-                st.info(f"ID: {r['id']} | Status: {r['status'].upper()} | Total: {r['total']}")
+            if results: st.table(pd.DataFrame(results))
+            else: st.warning("No records found.")
 
-# --- 8. SHIPPED ITEMS (Print & History) ---
+# --- 8. SHIPPED ITEMS ---
 elif menu == "🚚 Shipped Items":
     if sub == "Dispatch & Print":
         ready = [o for o in st.session_state.orders if o['status'] == 'confirm']
+        if not ready: st.info("No confirmed orders to dispatch.")
         for idx, ro in enumerate(ready):
             st.markdown(f"""
             <div class="print-area">
-                <div class="bill-head"><b>Herbal Crown Pvt Ltd</b><br>ID: {ro['id']}</div>
+                <div class="bill-head"><b>HAPPY SHOP (PVT) LTD</b><br>ID: {ro['id']}</div>
                 <div style="display:flex; border-bottom:2px solid black;">
-                    <div class="bc-box">||||||||||||||||</div>
+                    <div class="bc-box">|||| {ro['id']} ||||</div>
                     <div class="qty-box">QTY: {ro['qty']}</div>
                 </div>
                 <table class="way-table">
@@ -172,13 +217,20 @@ elif menu == "🚚 Shipped Items":
                 st.session_state.stocks[ro['prod']] -= ro['qty']
                 for o in st.session_state.orders: 
                     if o['id'] == ro['id']: o['status'] = 'shipped'
+                # ස්ටොක් සහ ඕඩර්ස් සේව් කිරීම
+                save_data(pd.DataFrame(st.session_state.orders), 'orders.csv')
+                save_data(pd.DataFrame(st.session_state.stocks.items(), columns=["Item", "Qty"]), 'stocks.csv')
                 st.components.v1.html("<script>window.print(); setTimeout(()=>window.location.reload(), 1000);</script>")
 
     elif sub == "Shipped List":
         shipped = [o for o in st.session_state.orders if o['status'] == 'shipped']
-        st.table(pd.DataFrame(shipped) if shipped else "No shipped items.")
+        if shipped:
+            df_shipped = pd.DataFrame(shipped)
+            st.dataframe(df_shipped)
+            st.download_button("📥 Download Shipped List", df_shipped.to_csv().encode('utf-8'), "shipped.csv")
+        else: st.info("No shipped items.")
 
-# --- 9. GRN & EXPENSES & RETURNS ---
+# --- 9. GRN, EXPENSES & RETURNS ---
 elif menu == "📦 GRN":
     if sub == "New GRN":
         with st.form("grn"):
@@ -187,16 +239,21 @@ elif menu == "📦 GRN":
             if st.form_submit_button("Add to Stock"):
                 st.session_state.stocks[p] += q
                 st.session_state.grn_history.append({"date": str(date.today()), "prod": p, "qty": q})
-                st.success("Updated!")
-    else: st.table(pd.DataFrame(st.session_state.grn_history))
+                save_data(pd.DataFrame(st.session_state.stocks.items(), columns=["Item", "Qty"]), 'stocks.csv')
+                save_data(pd.DataFrame(st.session_state.grn_history), 'grn.csv')
+                st.success("Stock Updated & Logged!")
+    else: 
+        if st.session_state.grn_history: st.table(pd.DataFrame(st.session_state.grn_history))
 
 elif menu == "💰 Expense":
     with st.form("exp"):
         c1, c2 = st.columns(2)
-        cat = c1.selectbox("Category", ["Marketing", "Packaging", "Courier Fee", "Salary"])
+        cat = c1.selectbox("Category", ["Marketing", "Packaging", "Courier Fee", "Salary", "Rent", "Utility"])
         amt = c2.number_input("Amount")
         if st.form_submit_button("Log Expense"):
             st.session_state.expenses.append({"date": str(date.today()), "cat": cat, "amount": amt})
+            save_data(pd.DataFrame(st.session_state.expenses), 'expenses.csv')
+            st.success("Expense Logged!")
     st.table(pd.DataFrame(st.session_state.expenses))
 
 elif menu == "🔄 Return":
@@ -206,14 +263,28 @@ elif menu == "🔄 Return":
             if o['id'] == rid:
                 o['status'] = 'returned'
                 st.session_state.stocks[o['prod']] += o['qty']
-                st.success("Stock Added Back & Status Updated.")
+                save_data(pd.DataFrame(st.session_state.orders), 'orders.csv')
+                save_data(pd.DataFrame(st.session_state.stocks.items(), columns=["Item", "Qty"]), 'stocks.csv')
+                st.success(f"Stock for {rid} Added Back & Status Updated.")
 
 elif menu == "📊 Stocks":
-    st.table(pd.DataFrame(st.session_state.stocks.items(), columns=["Item", "Available Qty"]))
+    df_s = pd.DataFrame(st.session_state.stocks.items(), columns=["Item", "Available Qty"])
+    st.table(df_s)
+    # Low Stock Highlight in Table
+    st.write("**Quick Adjustment**")
+    adj_p = st.selectbox("Product to Adjust", list(st.session_state.stocks.keys()))
+    adj_q = st.number_input("New Total Qty", value=st.session_state.stocks[adj_p])
+    if st.button("Update Stock"):
+        st.session_state.stocks[adj_p] = adj_q
+        save_data(pd.DataFrame(st.session_state.stocks.items(), columns=["Item", "Qty"]), 'stocks.csv')
+        st.rerun()
 
 elif menu == "🛍️ Products":
     with st.form("p"):
-        n = st.text_input("Product Name")
+        n = st.text_input("New Product Name")
         if st.form_submit_button("Add Product"):
-            st.session_state.stocks[n] = 0
-            st.success("New Product Ready!")
+            if n not in st.session_state.stocks:
+                st.session_state.stocks[n] = 0
+                save_data(pd.DataFrame(st.session_state.stocks.items(), columns=["Item", "Qty"]), 'stocks.csv')
+                st.success(f"{n} Added to Inventory!")
+            else: st.warning("Product already exists.")
