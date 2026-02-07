@@ -1,139 +1,128 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime, date
-import uuid
+from datetime import datetime
 import os
-import plotly.express as px
+import uuid
 
-# =========================================================
-# 1. පද්ධතියේ පෙනුම (Modern Professional UI)
-# =========================================================
-st.set_page_config(page_title="HappyShop ERP v8.0 PRO", layout="wide")
+# ==========================================
+# 1. පද්ධති සැකසුම් (UI)
+# ==========================================
+st.set_page_config(page_title="Pro Order System", layout="wide")
 
 st.markdown("""
 <style>
-    .stApp { background-color: #0d1117; color: white; }
-    .metric-card {
-        background: #161b22; padding: 20px; border-radius: 12px;
-        border: 1px solid #30363d; text-align: center;
-        border-top: 4px solid #FFD700;
-    }
-    .metric-card h2 { color: #FFD700; margin: 10px 0; font-size: 32px; }
-    .metric-card h4 { color: #8b949e; text-transform: uppercase; font-size: 12px; }
+    .stApp { background-color: #0e1117; color: white; }
+    .main-card { background: #1a1c23; padding: 20px; border-radius: 10px; border: 1px solid #333; }
+    .stock-card { background: #161b22; padding: 15px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #00d4ff; }
 </style>
 """, unsafe_allow_html=True)
 
-# =========================================================
-# 2. Database Engine (Zero-Error Architecture)
-# =========================================================
-# පින්තූරවල තිබූ නිවැරදි Column Names මෙන්න
-COLS = ["ID", "Date", "Customer", "Phone", "Location", "Product", "Qty", "Total", "Status", "Staff"]
-
-def initialize_database():
-    file = "leads.csv"
-    # වැදගත්ම කොටස: පරණ දත්ත සහ අලුත් කේතය නොගැලපේ නම් පරණ එක මකා දමයි
-    if os.path.exists(file):
-        try:
-            df = pd.read_csv(file)
-            # Column ගණන හෝ නම් වෙනස් නම් Reset කරයි
-            if list(df.columns) != COLS:
-                os.remove(file)
-                return pd.DataFrame(columns=COLS)
-            return df
-        except:
-            if os.path.exists(file): os.remove(file)
-            return pd.DataFrame(columns=COLS)
-    return pd.DataFrame(columns=COLS)
-
-# Session State එක හරහා දත්ත කළමනාකරණය
-if "db" not in st.session_state:
-    st.session_state.db = initialize_database()
-
-if "stock" not in st.session_state:
-    st.session_state.stock = pd.DataFrame([
-        {"Code": "KHO-01", "Product": "Kasharaja Hair Oil", "Qty": 225, "Price": 2950},
-        {"Code": "HNC-02", "Product": "Herbal Night Cream", "Qty": 85, "Price": 1800}
+# ==========================================
+# 2. Database Logic (SQL එකට සමානව)
+# ==========================================
+if "products" not in st.session_state:
+    st.session_state.products = pd.DataFrame([
+        {'id': 1, 'name': 'Kesharaja Hair Oil', 'code': 'VGLS0005', 'price': 2950, 'stock': 228},
+        {'id': 2, 'name': 'Herbal Crown', 'code': 'VGLS0001', 'price': 1800, 'stock': 53},
+        {'id': 3, 'name': 'Medahani Kalkaya', 'code': 'VGLS0003', 'price': 1200, 'stock': 597},
+        {'id': 4, 'name': 'Maas Go Capsules', 'code': 'VGLS0006', 'price': 2500, 'stock': 90}
     ])
 
-# =========================================================
-# 3. Sidebar Navigation
-# =========================================================
-with st.sidebar:
-    st.markdown("<h2 style='color: #FFD700;'>HAPPY SHOP ERP</h2>", unsafe_allow_html=True)
-    menu = st.radio("GO TO MODULE", ["📊 Dashboard", "📝 Add/Manage Leads", "📦 Inventory"])
-    st.divider()
+if "orders" not in st.session_state:
+    st.session_state.orders = pd.DataFrame(columns=["id", "customer", "contact", "city", "address", "payment", "total", "items"])
+
+# ==========================================
+# 3. ප්‍රධාන පාලක පුවරුව (Main Layout)
+# ==========================================
+st.title("📦 Advanced Order & Stock System")
+
+col1, col2 = st.columns([1.2, 0.8])
+
+# --- වම් පස: නව ඇණවුම (New Order) ---
+with col1:
+    st.subheader("🛒 New Order Form")
+    with st.container():
+        st.markdown('<div class="main-card">', unsafe_allow_html=True)
+        c_name = st.text_input("Customer Name")
+        c_contact = st.text_input("Contact Number")
+        
+        col_a, col_b = st.columns(2)
+        c_city = col_a.text_input("City")
+        c_pay = col_b.selectbox("Payment Method", ["COD", "Card"])
+        c_address = st.text_area("Address")
+
+        st.markdown("---")
+        st.write("🛍️ **Order Items**")
+        
+        # අයිතම කිහිපයක් ඇඩ් කිරීමේ පහසුකම (Multi-item logic)
+        if "temp_items" not in st.session_state:
+            st.session_state.temp_items = []
+
+        selected_p = st.selectbox("Select Product", st.session_state.products['name'])
+        p_qty = st.number_input("Quantity", min_value=1, value=1)
+        
+        if st.button("+ Add to List"):
+            p_data = st.session_state.products[st.session_state.products['name'] == selected_p].iloc[0]
+            st.session_state.temp_items.append({
+                "name": selected_p,
+                "qty": p_qty,
+                "price": p_data['price'],
+                "subtotal": p_data['price'] * p_qty
+            })
+
+        # දැනට ලිස්ට් එකේ තියෙන බඩු පෙන්වීම
+        if st.session_state.temp_items:
+            item_df = pd.DataFrame(st.session_state.temp_items)
+            st.table(item_df)
+            grand_total = item_df['subtotal'].sum()
+            st.metric("Grand Total (LKR)", f"{grand_total:,.2f}")
+
+            if st.button("🚀 Save Complete Order"):
+                order_id = len(st.session_state.orders) + 1
+                new_order = {
+                    "id": order_id,
+                    "customer": c_name,
+                    "contact": c_contact,
+                    "city": c_city,
+                    "address": c_address,
+                    "payment": c_pay,
+                    "total": grand_total,
+                    "items": str(st.session_state.temp_items)
+                }
+                
+                # Stock Update කිරීම (PHP Code එකේ තිබූ Update Logic එක)
+                for item in st.session_state.temp_items:
+                    st.session_state.products.loc[st.session_state.products['name'] == item['name'], 'stock'] -= item['qty']
+                
+                st.session_state.orders = pd.concat([st.session_state.orders, pd.DataFrame([new_order])], ignore_index=True)
+                st.session_state.temp_items = [] # Reset list
+                st.success("Order Saved Successfully and Stock Updated!")
+                st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+
+# --- දකුණු පස: තොග පාලනය (Stock Adjustment) ---
+with col2:
+    st.subheader("⚙️ Stock Adjustment")
+    st.markdown('<div class="main-card">', unsafe_allow_html=True)
     
-    # පද්ධතියේ ගැටලු විසඳීමට ඇති එකම මාර්ගය
-    if st.button("🔄 Clean & Fix System"):
-        if os.path.exists("leads.csv"): os.remove("leads.csv")
-        st.session_state.db = pd.DataFrame(columns=COLS)
-        st.success("System Reset Completed!")
-        st.rerun()
+    for index, row in st.session_state.products.iterrows():
+        st.markdown(f'''
+        <div class="stock-card">
+            <small>{row['code']}</small><br>
+            <b>{row['name']}</b><br>
+            Current Stock: {row['stock']}
+        </div>
+        ''', unsafe_allow_html=True)
+        new_s = st.number_input(f"Update {row['name']}", value=int(row['stock']), key=f"stock_{row['id']}")
+        st.session_state.products.at[index, 'stock'] = new_s
 
-# =========================================================
-# 4. Dashboard Implementation
-# =========================================================
-if menu == "📊 Dashboard":
-    df = st.session_state.db
-    
-    # පින්තූරවල තිබූ Metrics 5
-    m1, m2, m3, m4, m5 = st.columns(5)
-    with m1: st.markdown(f'<div class="metric-card"><h4>Total Leads</h4><h2>{len(df)}</h2></div>', unsafe_allow_html=True)
-    with m2: st.markdown(f'<div class="metric-card"><h4>Confirmed</h4><h2>{len(df[df["Status"]=="Confirmed"])}</h2></div>', unsafe_allow_html=True)
-    with m3: st.markdown(f'<div class="metric-card"><h4>No Answer</h4><h2>{len(df[df["Status"]=="No Answer"])}</h2></div>', unsafe_allow_html=True)
-    with m4: st.markdown(f'<div class="metric-card"><h4>Cancelled</h4><h2>{len(df[df["Status"]=="Cancelled"])}</h2></div>', unsafe_allow_html=True)
-    with m5: st.markdown(f'<div class="metric-card"><h4>On Hold</h4><h2>{len(df[df["Status"]=="Hold"])}</h2></div>', unsafe_allow_html=True)
+    if st.button("Update All Stock"):
+        st.success("Stock levels updated manually!")
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    st.divider()
-    
-    if not df.empty:
-        fig = px.bar(df, x="Date", y="Total", color="Status", title="Daily Sales Status", template="plotly_dark")
-        fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("පද්ධතියට තවම දත්ත ඇතුළත් කර නැත. කරුණාකර 'Add/Manage Leads' වෙත යන්න.")
-
-# =========================================================
-# 5. Lead Entry (පින්තූරවල තිබූ විදියටම)
-# =========================================================
-elif menu == "📝 Add/Manage Leads":
-    st.subheader("📝 Lead & Order Management")
-    
-    with st.expander("➕ Click to Add New Lead", expanded=True):
-        with st.form("lead_form", clear_on_submit=True):
-            c1, c2, c3 = st.columns(3)
-            name = c1.text_input("Customer Name")
-            phone = c1.text_input("Phone Number")
-            loc = c1.text_input("City/Location")
-            
-            prod = c2.selectbox("Product", st.session_state.stock["Product"])
-            qty = c2.number_input("Qty", 1)
-            
-            status = c3.selectbox("Status", ["Pending", "Confirmed", "No Answer", "Hold", "Cancelled"])
-            staff = c3.text_input("Staff Name", "Admin")
-            
-            if st.form_submit_button("SAVE LEAD"):
-                if name and phone:
-                    price = st.session_state.stock.loc[st.session_state.stock["Product"] == prod, "Price"].values[0]
-                    new_id = f"HS-{uuid.uuid4().hex[:4].upper()}"
-                    new_row = {
-                        "ID": new_id, "Date": str(date.today()), "Customer": name, "Phone": phone,
-                        "Location": loc, "Product": prod, "Qty": qty, "Total": price*qty,
-                        "Status": status, "Staff": staff
-                    }
-                    st.session_state.db = pd.concat([st.session_state.db, pd.DataFrame([new_row])], ignore_index=True)
-                    st.session_state.db.to_csv("leads.csv", index=False)
-                    st.success("Lead Saved Successfully!")
-                    st.rerun()
-                else:
-                    st.error("නම සහ දුරකථන අංකය අනිවාර්ය වේ!")
-
-    st.markdown("### 📋 Lead Data Table")
-    st.dataframe(st.session_state.db, use_container_width=True)
-
-# =========================================================
-# 6. Inventory
-# =========================================================
-elif menu == "📦 Inventory":
-    st.subheader("📦 Product Stock")
-    st.table(st.session_state.stock)
+# ==========================================
+# 4. ඇණවුම් ලේඛනය (Orders Table)
+# ==========================================
+st.divider()
+st.subheader("📜 Recent Orders")
+st.dataframe(st.session_state.orders, use_container_width=True)
