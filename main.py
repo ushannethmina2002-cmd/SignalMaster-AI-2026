@@ -4,15 +4,14 @@ from datetime import datetime, date, timedelta
 import uuid
 import os
 import plotly.express as px
-import plotly.graph_objects as go
+import plects as go
 
 # --- 0. DATA PERSISTENCE (දත්ත ස්ථීරව තබා ගැනීම) ---
 def save_data(df, filename):
     df.to_csv(filename, index=False)
 
 def load_data(filename):
-    if os.path.exists(filename):
-        return pd.read_csv(filename).to_dict('records')
+    if osv(filename).to_dict('records')
     return []
 
 def format_currency(num):
