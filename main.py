@@ -21,12 +21,20 @@ st.markdown("""
         background-attachment: fixed;
     }
 
-    /* Sidebar Styling (Pinned & Professional) */
+    /* Sidebar Styling */
     [data-testid="stSidebar"] {
         background: rgba(10, 15, 30, 0.9) !important;
         backdrop-filter: blur(20px);
         border-right: 1px solid rgba(255, 255, 255, 0.1);
-        min-width: 100px !important;
+    }
+
+    /* Section Headers in Sidebar */
+    .sidebar-section {
+        color: #00d4ff;
+        font-weight: bold;
+        font-size: 14px;
+        margin-top: 15px;
+        text-transform: uppercase;
     }
 
     /* Top Navigation Bar */
@@ -42,7 +50,6 @@ st.markdown("""
         margin-bottom: 20px;
     }
 
-    /* Status Badges (Horizontal Labels from Image) */
     .status-badge {
         padding: 8px 18px;
         border-radius: 8px;
@@ -54,7 +61,6 @@ st.markdown("""
         display: inline-block;
     }
 
-    /* Glass Panels */
     .glass-card {
         background: rgba(255, 255, 255, 0.03) !important;
         backdrop-filter: blur(20px);
@@ -64,10 +70,9 @@ st.markdown("""
         margin-bottom: 15px;
     }
 
-    /* Table & Metric Design */
     .stDataFrame { background: white !important; border-radius: 10px; padding: 5px; }
     div[data-testid="stMetricValue"] { color: #00d4ff !important; font-size: 24px !important; }
-    h1, h2, h3, p, label { color: white !important; font-family: 'Inter', sans-serif; }
+    h1, h2, h3, p, label, .stMarkdown { color: white !important; font-family: 'Inter', sans-serif; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -82,12 +87,10 @@ def load_data(filename, default_cols):
         return pd.read_csv(filename)
     return pd.DataFrame(columns=default_cols)
 
-# Session States initialization
 if "orders_df" not in st.session_state:
     st.session_state.orders_df = load_data("orders.csv", ["id", "date", "name", "phone", "address", "prod", "qty", "total", "status", "staff"])
 
 if "stock_df" not in st.session_state:
-    # පින්තූරයේ තිබූ දත්ත ඇසුරින් Default Stock
     initial_stock = [
         {"Product": "Kasharaja Hair Oil", "Code": "KHO-01", "Qty": 225, "Price": 2950},
         {"Product": "Herbal Night Cream", "Code": "HNC-02", "Qty": 85, "Price": 1800},
@@ -127,24 +130,62 @@ else:
     """, unsafe_allow_html=True)
 
     # ---------------------------------------------------------
-    # SIDEBAR
+    # SIDEBAR (Updated with Image Menu Items)
     # ---------------------------------------------------------
     with st.sidebar:
         st.markdown("<h2 style='text-align:center;'>💎</h2>", unsafe_allow_html=True)
         st.divider()
-        menu = st.radio("SELECT MODULE", [
-            "🏠 Dashboard", 
-            "🔍 Leads Search", 
-            "🧾 Order Entry", 
-            "🚚 Logistics",
-            "📦 Stock Manager",
-            "💰 Finance"
-        ], label_visibility="collapsed")
+
+        # Dashboard Always on top
+        if st.button("🏠 Dashboard", use_container_width=True):
+            st.session_state.menu_choice = "🏠 Dashboard"
         
+        # Section 1: Orders & Leads (Image 3)
+        with st.expander("🔍 ORDERS & LEADS"):
+            choice1 = st.radio("Actions", [
+                "New Order", "Pending Orders", "Order Search", 
+                "Import Lead", "View Lead", "Add Lead", 
+                "Order History", "Exchanging Orders", "Blacklist Manager"
+            ], key="orders_lead")
+            if choice1: st.session_state.menu_choice = choice1
+
+        # Section 2: Logistics & Shipping (Image 7 & 1)
+        with st.expander("🚚 LOGISTICS & SHIPPING"):
+            choice2 = st.radio("Actions", [
+                "Ship", "Shipped List", "Shipped Summary", "Delivery Summary", 
+                "Courier Feedback", "Confirm Dispatch", "Print Dispatch Items", 
+                "Search Waybills", "Courier Feedback Summary", "Packing", "Packing List"
+            ], key="logistics")
+            if choice2: st.session_state.menu_choice = choice2
+
+        # Section 3: Inventory & Products (Image 1, 2, 4)
+        with st.expander("📦 INVENTORY CONTROL"):
+            choice3 = st.radio("Actions", [
+                "View Stocks", "Stock Adjustment", "Stock Adjustment View", 
+                "Add Waste", "Stock Values", "Create Product", "View Products", 
+                "Raw Items", "New GRN", "GRN List", "Reorder List", "New PO", "PO List"
+            ], key="inventory")
+            if choice3: st.session_state.menu_choice = choice3
+
+        # Section 4: Finance & Expenses (Image 6 & 5)
+        with st.expander("💰 FINANCE & RETURNS"):
+            choice4 = st.radio("Actions", [
+                "New Expense", "View Expenses", "Create Expense Type", 
+                "View Expense Type", "POS Expenses", "Add Returns", 
+                "Returned Orders", "Pending Returns"
+            ], key="finance")
+            if choice4: st.session_state.menu_choice = choice4
+
         st.divider()
         if st.button("🔴 Logout", use_container_width=True):
             st.session_state.user = None
             st.rerun()
+
+    # Initial Menu Choice
+    if "menu_choice" not in st.session_state:
+        st.session_state.menu_choice = "🏠 Dashboard"
+    
+    menu = st.session_state.menu_choice
 
     # ---------------------------------------------------------
     # MAIN CONTENT & ACTION PANEL
@@ -168,21 +209,16 @@ else:
                 fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color="white")
                 st.plotly_chart(fig, use_container_width=True)
 
-        # --- MODULE: LEADS SEARCH (All image features added) ---
-        elif menu == "🔍 Leads Search":
-            st.subheader("🔍 Advanced Lead Management")
-            
-            # Filters Row
-            with st.container():
-                f1, f2, f3, f4 = st.columns(4)
-                s_filter = f1.selectbox("Filter Status", ["Any", "pending", "confirm", "noanswer", "fake", "hold"])
-                u_filter = f2.selectbox("Staff User", ["Any", "Admin", "Staff 01", "Staff 02"])
-                date_start = f3.date_input("From Date", date.today())
-                date_end = f4.date_input("To Date", date.today())
+        # --- MODULE: LEADS SEARCH (Matches Original Code) ---
+        elif menu in ["Order Search", "View Lead"]:
+            st.subheader(f"🔍 {menu}")
+            f1, f2, f3, f4 = st.columns(4)
+            s_filter = f1.selectbox("Filter Status", ["Any", "pending", "confirm", "noanswer", "fake", "hold"])
+            u_filter = f2.selectbox("Staff User", ["Any", "Admin", "Staff 01", "Staff 02"])
+            date_start = f3.date_input("From Date", date.today())
+            date_end = f4.date_input("To Date", date.today())
 
             st.divider()
-
-            # Horizontal Status Counters (From Image)
             df = st.session_state.orders_df
             st.markdown(f"""
                 <div style="margin-bottom:20px;">
@@ -195,30 +231,25 @@ else:
             """, unsafe_allow_html=True)
 
             if not df.empty:
-                # Table View
                 st.dataframe(df, use_container_width=True)
-                
-                # Quick Action Section
                 st.markdown("### ⚡ Quick Update Console")
                 selected_id = st.selectbox("Select Record ID to update", df['id'].tolist())
                 c1, c2, c3, c4 = st.columns(4)
-                if c1.button("Confirm ✅", key="btn_conf"):
+                if c1.button("Confirm ✅"):
                     st.session_state.orders_df.loc[st.session_state.orders_df['id'] == selected_id, 'status'] = 'confirm'
                     save_data(st.session_state.orders_df, "orders.csv"); st.rerun()
-                if c2.button("No Answer 📞", key="btn_na"):
+                if c2.button("No Answer 📞"):
                     st.session_state.orders_df.loc[st.session_state.orders_df['id'] == selected_id, 'status'] = 'noanswer'
                     save_data(st.session_state.orders_df, "orders.csv"); st.rerun()
-                if c3.button("Fake 🚫", key="btn_fake"):
+                if c3.button("Fake 🚫"):
                     st.session_state.orders_df.loc[st.session_state.orders_df['id'] == selected_id, 'status'] = 'fake'
                     save_data(st.session_state.orders_df, "orders.csv"); st.rerun()
-                if c4.button("Delete 🗑️", key="btn_del"):
+                if c4.button("Delete 🗑️"):
                     st.session_state.orders_df = st.session_state.orders_df[st.session_state.orders_df['id'] != selected_id]
                     save_data(st.session_state.orders_df, "orders.csv"); st.rerun()
-            else:
-                st.info("No leads available in the database.")
 
-        # --- MODULE: ORDER ENTRY ---
-        elif menu == "🧾 Order Entry":
+        # --- MODULE: ORDER ENTRY (Matches Original Code) ---
+        elif menu in ["New Order", "Add Lead"]:
             st.title("📝 New Lead Submission")
             with st.form("entry_form"):
                 c1, c2 = st.columns(2)
@@ -230,62 +261,30 @@ else:
                     prod = st.selectbox("Select Product", st.session_state.stock_df['Product'].tolist())
                     qty = st.number_input("Quantity", 1, 100)
                     staff = st.session_state.user['name']
-                
                 if st.form_submit_button("🚀 SYNC TO DATABASE"):
                     if name and phone:
                         price = st.session_state.stock_df.loc[st.session_state.stock_df['Product'] == prod, 'Price'].values[0]
                         oid = f"HS-{uuid.uuid4().hex[:6].upper()}"
-                        new_row = {
-                            "id": oid, "date": str(date.today()), "name": name, "phone": phone, 
-                            "address": address, "prod": prod, "qty": qty, "total": qty * price, 
-                            "status": "pending", "staff": staff
-                        }
+                        new_row = {"id": oid, "date": str(date.today()), "name": name, "phone": phone, "address": address, "prod": prod, "qty": qty, "total": qty * price, "status": "pending", "staff": staff}
                         st.session_state.orders_df = pd.concat([st.session_state.orders_df, pd.DataFrame([new_row])], ignore_index=True)
                         save_data(st.session_state.orders_df, "orders.csv")
                         st.balloons(); st.success(f"Order {oid} recorded!")
-                    else:
-                        st.error("Fields with * are mandatory.")
 
-        # --- MODULE: LOGISTICS ---
-        elif menu == "🚚 Logistics":
-            st.title("🚚 Dispatch & Logistics")
-            df_log = st.session_state.orders_df[st.session_state.orders_df['status'] == 'confirm']
-            if not df_log.empty:
-                st.dataframe(df_log)
-                if st.button("Download Waybill Sheet"): st.toast("Processing CSV...")
-            else:
-                st.info("No confirmed orders for logistics.")
-
-        # --- MODULE: STOCK MANAGER (Image features added) ---
-        elif menu == "📦 Stock Manager":
+        # --- MODULE: STOCK MANAGER ---
+        elif menu in ["View Stocks", "Stock Adjustment"]:
             st.title("📦 Inventory Control Center")
             tab1, tab2 = st.tabs(["📊 Stock Summary", "⚙️ Adjustment Console"])
-            
-            with tab1:
-                st.dataframe(st.session_state.stock_df, use_container_width=True)
-            
+            with tab1: st.dataframe(st.session_state.stock_df, use_container_width=True)
             with tab2:
-                st.write("Edit quantities directly below and Save:")
-                edited_stock = st.data_editor(st.session_state.stock_df, num_rows="dynamic", key="stock_editor")
+                edited_stock = st.data_editor(st.session_state.stock_df, num_rows="dynamic")
                 if st.button("Save Changes"):
                     st.session_state.stock_df = edited_stock
-                    st.success("Inventory updated successfully!")
+                    st.success("Inventory updated!")
 
-        # --- MODULE: FINANCE ---
-        elif menu == "💰 Finance":
-            st.title("💰 Revenue Insights")
-            if st.session_state.user['role'] == "OWNER":
-                df_fin = st.session_state.orders_df
-                c1, c2 = st.columns(2)
-                c1.metric("Total Outstanding", f"LKR {df_fin['total'].sum():,.2f}")
-                c2.metric("Confirmed Sales", f"LKR {df_fin[df_fin['status'] == 'confirm']['total'].sum():,.2f}")
-                
-                if not df_fin.empty:
-                    fig_pie = px.pie(df_fin, values='total', names='prod', title="Sales Distribution by SKU")
-                    fig_pie.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color="white")
-                    st.plotly_chart(fig_pie, use_container_width=True)
-            else:
-                st.error("Admin permissions required.")
+        # --- OTHER MODULES PLACEHOLDER ---
+        else:
+            st.title(f"📂 {menu}")
+            st.info("මෙම මොඩියුලය සඳහා දත්ත පද්ධතිය ක්‍රියාත්මක වෙමින් පවතී.")
 
     # ---------------------------------------------------------
     # RIGHT ACTION PANEL
@@ -296,7 +295,7 @@ else:
                 <h4 style="color:#00d4ff; font-size:16px;">⚡ QUICK CONSOLE</h4>
                 <hr style="border:0.1px solid rgba(255,255,255,0.1);">
                 <p style="font-size:12px;">System: <b>Cloud Connected 🟢</b></p>
-                <p style="font-size:12px;">Role: <b>{st.session_state.user['role']}</b></p>
+                <p style="font-size:12px;">Active Menu: <b>{menu}</b></p>
                 <br>
                 <p style="font-size:14px;">📝 <b>Notes:</b></p>
                 <textarea style="width:100%; height:150px; background:rgba(0,0,0,0.3); border:1px solid #333; color:white; border-radius:10px; padding:10px;"></textarea>
