@@ -1,25 +1,52 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
 import os
 import uuid
+from datetime import datetime
 
 # ==========================================
-# 1. පද්ධති සැකසුම් (UI)
+# 1. පද්ධති සැකසුම් (Professional Sidebar UI)
 # ==========================================
-st.set_page_config(page_title="Pro Order System", layout="wide")
+st.set_page_config(page_title="HappyShop Ultimate ERP", layout="wide")
 
 st.markdown("""
 <style>
-    .stApp { background-color: #0e1117; color: white; }
-    .main-card { background: #1a1c23; padding: 20px; border-radius: 10px; border: 1px solid #333; }
-    .stock-card { background: #161b22; padding: 15px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid #00d4ff; }
+    .stApp { background-color: #f8f9fa; color: #333; }
+    /* සයිඩ්බාර් එකේ පෙනුම ඔයාගේ CSS එකට අනුව */
+    [data-testid="stSidebar"] {
+        background-color: #ffffff !important;
+        border-right: 1px solid #ddd;
+    }
+    .nav-item {
+        display: block; padding: 10px 15px;
+        text-decoration: none; color: #333;
+        font-size: 14px; border-radius: 5px;
+        margin-bottom: 2px;
+    }
+    .nav-item:hover { background-color: #f2f2f2; }
+    .main-content { margin-left: 20px; padding: 20px; }
+    .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
 </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. Database Logic (SQL එකට සමානව)
+# 2. Database Logic (Menus, Products, Orders)
 # ==========================================
+
+# මෙනු දත්ත ගබඩාව (ඔයා එවපු INSERT INTO ටික)
+if "menus" not in st.session_state:
+    initial_menus = [
+        {'id': 1, 'title': 'Dashboard', 'link': 'Dashboard', 'icon': '📊'},
+        {'id': 2, 'title': 'New Order', 'link': 'New Order', 'icon': '📝'},
+        {'id': 3, 'title': 'Stock', 'link': 'Stock', 'icon': '📦'},
+        {'id': 4, 'title': 'WhatsApp', 'link': 'WhatsApp', 'icon': '💬'},
+        {'id': 5, 'title': 'Profit', 'link': 'Profit', 'icon': '💰'},
+        {'id': 6, 'title': 'Menu Manager', 'link': 'Menu Manager', 'icon': '⚙️'}
+    ]
+    # මෙහි ඔයා එවපු අනෙක් මෙනු 40ම පද්ධතියට ඇතුළත් කළ හැක.
+    st.session_state.menus = pd.DataFrame(initial_menus)
+
+# නිෂ්පාදන දත්ත (SQL INSERT INTO ටික)
 if "products" not in st.session_state:
     st.session_state.products = pd.DataFrame([
         {'id': 1, 'name': 'Kesharaja Hair Oil', 'code': 'VGLS0005', 'price': 2950, 'stock': 228},
@@ -29,100 +56,100 @@ if "products" not in st.session_state:
     ])
 
 if "orders" not in st.session_state:
-    st.session_state.orders = pd.DataFrame(columns=["id", "customer", "contact", "city", "address", "payment", "total", "items"])
+    st.session_state.orders = pd.DataFrame(columns=["id", "customer", "total", "payment", "date"])
 
 # ==========================================
-# 3. ප්‍රධාන පාලක පුවරුව (Main Layout)
+# 3. Dynamic Sidebar (ඔයා එවපු PHP Logic එක)
 # ==========================================
-st.title("📦 Advanced Order & Stock System")
-
-col1, col2 = st.columns([1.2, 0.8])
-
-# --- වම් පස: නව ඇණවුම (New Order) ---
-with col1:
-    st.subheader("🛒 New Order Form")
-    with st.container():
-        st.markdown('<div class="main-card">', unsafe_allow_html=True)
-        c_name = st.text_input("Customer Name")
-        c_contact = st.text_input("Contact Number")
-        
-        col_a, col_b = st.columns(2)
-        c_city = col_a.text_input("City")
-        c_pay = col_b.selectbox("Payment Method", ["COD", "Card"])
-        c_address = st.text_area("Address")
-
-        st.markdown("---")
-        st.write("🛍️ **Order Items**")
-        
-        # අයිතම කිහිපයක් ඇඩ් කිරීමේ පහසුකම (Multi-item logic)
-        if "temp_items" not in st.session_state:
-            st.session_state.temp_items = []
-
-        selected_p = st.selectbox("Select Product", st.session_state.products['name'])
-        p_qty = st.number_input("Quantity", min_value=1, value=1)
-        
-        if st.button("+ Add to List"):
-            p_data = st.session_state.products[st.session_state.products['name'] == selected_p].iloc[0]
-            st.session_state.temp_items.append({
-                "name": selected_p,
-                "qty": p_qty,
-                "price": p_data['price'],
-                "subtotal": p_data['price'] * p_qty
-            })
-
-        # දැනට ලිස්ට් එකේ තියෙන බඩු පෙන්වීම
-        if st.session_state.temp_items:
-            item_df = pd.DataFrame(st.session_state.temp_items)
-            st.table(item_df)
-            grand_total = item_df['subtotal'].sum()
-            st.metric("Grand Total (LKR)", f"{grand_total:,.2f}")
-
-            if st.button("🚀 Save Complete Order"):
-                order_id = len(st.session_state.orders) + 1
-                new_order = {
-                    "id": order_id,
-                    "customer": c_name,
-                    "contact": c_contact,
-                    "city": c_city,
-                    "address": c_address,
-                    "payment": c_pay,
-                    "total": grand_total,
-                    "items": str(st.session_state.temp_items)
-                }
-                
-                # Stock Update කිරීම (PHP Code එකේ තිබූ Update Logic එක)
-                for item in st.session_state.temp_items:
-                    st.session_state.products.loc[st.session_state.products['name'] == item['name'], 'stock'] -= item['qty']
-                
-                st.session_state.orders = pd.concat([st.session_state.orders, pd.DataFrame([new_order])], ignore_index=True)
-                st.session_state.temp_items = [] # Reset list
-                st.success("Order Saved Successfully and Stock Updated!")
-                st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
-
-# --- දකුණු පස: තොග පාලනය (Stock Adjustment) ---
-with col2:
-    st.subheader("⚙️ Stock Adjustment")
-    st.markdown('<div class="main-card">', unsafe_allow_html=True)
+with st.sidebar:
+    st.markdown("### 🛒 ORDER SYSTEM")
+    st.divider()
     
-    for index, row in st.session_state.products.iterrows():
-        st.markdown(f'''
-        <div class="stock-card">
-            <small>{row['code']}</small><br>
-            <b>{row['name']}</b><br>
-            Current Stock: {row['stock']}
-        </div>
-        ''', unsafe_allow_html=True)
-        new_s = st.number_input(f"Update {row['name']}", value=int(row['stock']), key=f"stock_{row['id']}")
-        st.session_state.products.at[index, 'stock'] = new_s
-
-    if st.button("Update All Stock"):
-        st.success("Stock levels updated manually!")
-    st.markdown('</div>', unsafe_allow_html=True)
+    # මෙනු ලැයිස්තුව පෙන්වීම
+    selection = "Dashboard" # Default
+    for index, row in st.session_state.menus.iterrows():
+        if st.button(f"{row['icon']} {row['title']}", key=f"menu_{row['id']}", use_container_width=True):
+            st.session_state.current_page = row['link']
+    
+    if "current_page" not in st.session_state:
+        st.session_state.current_page = "Dashboard"
 
 # ==========================================
-# 4. ඇණවුම් ලේඛනය (Orders Table)
+# 4. පද්ධතියේ පිටු (Pages)
 # ==========================================
-st.divider()
-st.subheader("📜 Recent Orders")
-st.dataframe(st.session_state.orders, use_container_width=True)
+page = st.session_state.current_page
+
+# --- MENU MANAGER (ඔයාගේ PHP CRUD Logic එක) ---
+if page == "Menu Manager":
+    st.title("⚙️ Menu Manager")
+    
+    # Add Menu Form
+    with st.expander("➕ Add New Menu Item"):
+        with st.form("add_menu"):
+            m_title = st.text_input("Title")
+            m_link = st.text_input("Link Name")
+            m_icon = st.text_input("Icon (Emoji)")
+            if st.form_submit_button("Add Menu"):
+                new_id = st.session_state.menus['id'].max() + 1
+                new_row = {'id': new_id, 'title': m_title, 'link': m_link, 'icon': m_icon}
+                st.session_state.menus = pd.concat([st.session_state.menus, pd.DataFrame([new_row])], ignore_index=True)
+                st.rerun()
+
+    # Menu Table & Delete
+    st.table(st.session_state.menus)
+    del_id = st.number_input("Enter Menu ID to Delete", min_value=1, step=1)
+    if st.button("Delete Menu"):
+        st.session_state.menus = st.session_state.menus[st.session_state.menus['id'] != del_id]
+        st.rerun()
+
+# --- DASHBOARD ---
+elif page == "Dashboard":
+    st.title("📊 Business Dashboard")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Total Orders", len(st.session_state.orders))
+    col2.metric("Total Revenue", f"Rs. {st.session_state.orders['total'].sum():,.2f}")
+    col3.metric("Low Stock Items", len(st.session_state.products[st.session_state.products['stock'] < 100]))
+    
+    st.divider()
+    st.subheader("Recent Orders")
+    st.dataframe(st.session_state.orders, use_container_width=True)
+
+# --- NEW ORDER ---
+elif page == "New Order":
+    st.title("📝 Create New Order")
+    with st.form("order_form"):
+        c_name = st.text_input("Customer Name")
+        c_contact = st.text_input("Contact")
+        c_city = st.text_input("City")
+        c_pay = st.selectbox("Payment Method", ["COD", "Card"])
+        
+        # Multi-product Selection
+        selected_p = st.multiselect("Select Products", st.session_state.products['name'])
+        
+        if st.form_submit_button("Save Order"):
+            total_price = 0
+            for p_name in selected_p:
+                price = st.session_state.products.loc[st.session_state.products['name'] == p_name, 'price'].values[0]
+                total_price += price
+                # Stock Update
+                st.session_state.products.loc[st.session_state.products['name'] == p_name, 'stock'] -= 1
+            
+            new_order = {
+                "id": len(st.session_state.orders) + 1,
+                "customer": c_name,
+                "total": total_price,
+                "payment": c_pay,
+                "date": datetime.now().strftime("%Y-%m-%d")
+            }
+            st.session_state.orders = pd.concat([st.session_state.orders, pd.DataFrame([new_order])], ignore_index=True)
+            st.success("Order Created Successfully!")
+
+# --- STOCK ---
+elif page == "Stock":
+    st.title("📦 Stock Inventory")
+    st.dataframe(st.session_state.products, use_container_width=True)
+
+# --- අනෙකුත් පිටු (Placeholders) ---
+else:
+    st.title(f"{page}")
+    st.info(f"This is the {page} module. You can add specific logic here.")
