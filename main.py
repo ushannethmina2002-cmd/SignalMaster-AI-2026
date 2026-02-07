@@ -8,7 +8,7 @@ import plotly.express as px
 # =========================================================
 # 1. ADVANCED UI & THEME CONFIGURATION
 # =========================================================
-st.set_page_config(page_title="HappyShop ERP ADVANCED", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="HappyShop ERP PRO", layout="wide", initial_sidebar_state="expanded")
 
 st.markdown("""
 <style>
@@ -19,11 +19,11 @@ st.markdown("""
         color: white;
     }
 
-    /* Professional Sidebar */
+    /* Sidebar Styling */
     [data-testid="stSidebar"] {
-        background: rgba(0, 0, 0, 0.7) !important;
+        background: rgba(0, 0, 0, 0.8) !important;
         backdrop-filter: blur(15px);
-        border-right: 1px solid #FFD700;
+        border-right: 2px solid #FFD700;
     }
 
     .brand-title {
@@ -31,33 +31,45 @@ st.markdown("""
         font-weight: 800;
         color: #FFD700;
         text-align: center;
-        margin-bottom: 30px;
+        margin-bottom: 10px;
         text-shadow: 2px 2px 10px rgba(255, 215, 0, 0.3);
     }
 
-    /* Glassmorphism Cards */
-    .data-card {
-        background: rgba(255, 255, 255, 0.05);
-        border-radius: 15px;
-        padding: 20px;
-        border: 1px solid rgba(255, 215, 0, 0.1);
+    /* Professional Metric Cards */
+    .metric-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
         margin-bottom: 20px;
     }
 
-    .top-nav {
-        display: flex;
-        justify-content: space-between;
+    .metric-card {
+        background: rgba(255, 255, 255, 0.05);
         padding: 15px;
-        background: rgba(255, 255, 255, 0.03);
-        border-radius: 10px;
-        margin-bottom: 25px;
+        border-radius: 12px;
+        border-left: 5px solid #FFD700;
+        min-width: 160px;
+        flex: 1;
+        text-align: center;
     }
 
-    div[data-testid="stMetric"] {
+    .metric-card h4 { margin: 0; font-size: 14px; color: #ccc; }
+    .metric-card h2 { margin: 5px 0; font-size: 24px; color: #FFD700; }
+
+    /* Custom Status Colors */
+    .status-confirmed { border-left-color: #2ecc71; }
+    .status-pending { border-left-color: #3498db; }
+    .status-noanswer { border-left-color: #f1c40f; }
+    .status-cancel { border-left-color: #e74c3c; }
+    .status-fake { border-left-color: #95a5a6; }
+    .status-hold { border-left-color: #9b59b6; }
+
+    .top-nav {
         background: rgba(255, 255, 255, 0.03);
         padding: 15px;
-        border-radius: 10px;
-        border-bottom: 3px solid #FFD700;
+        border-radius: 15px;
+        border: 1px solid rgba(255, 215, 0, 0.2);
+        margin-bottom: 25px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -69,7 +81,6 @@ def load_db(file, columns):
     if os.path.exists(file): return pd.read_csv(file)
     return pd.DataFrame(columns=columns)
 
-# Initialize All Databases from Images
 if "db" not in st.session_state:
     st.session_state.db = {
         "orders": load_db("orders.csv", ["id", "date", "name", "phone", "address", "prod", "qty", "total", "status", "staff"]),
@@ -80,7 +91,6 @@ if "db" not in st.session_state:
         "grn_po": load_db("grn_po.csv", ["type", "id", "date", "supplier", "items", "total", "status"])
     }
 
-# Default Stock if empty
 if st.session_state.db["stock"].empty:
     st.session_state.db["stock"] = pd.DataFrame([
         {"Code": "KHO-01", "Product": "Kasharaja Hair Oil", "Qty": 100, "Price": 2950, "Value": 295000, "Type": "Finished"},
@@ -88,132 +98,134 @@ if st.session_state.db["stock"].empty:
     ])
 
 # =========================================================
-# 3. SIDEBAR NAVIGATION (Mapped to your Images)
+# 3. SIDEBAR NAVIGATION
 # =========================================================
 with st.sidebar:
     st.markdown('<div class="brand-title">Happy Shop</div>', unsafe_allow_html=True)
+    st.markdown('<p style="text-align:center; color:#FFD700; font-size:12px;">ENTERPRISE RESOURCE PLANNING</p>', unsafe_allow_html=True)
+    st.divider()
     
     nav = st.radio("MAIN MENU", ["🏠 Dashboard", "📦 Inventory Control", "🛒 Sales & Leads", "🚚 Logistics", "💰 Finance", "🔄 Returns"])
     
     st.divider()
     if st.button("🚪 Logout", use_container_width=True):
-        st.write("Logged out")
+        st.info("System Session Ended.")
 
 # =========================================================
 # 4. MODULES IMPLEMENTATION
 # =========================================================
 
-# --- DASHBOARD ---
+# --- DASHBOARD (BUSINESS ANALYTICS) ---
 if nav == "🏠 Dashboard":
-    st.markdown('<div class="top-nav"><h3>🚀 Executive Overview</h3></div>', unsafe_allow_html=True)
-    m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Total Sales", f"Rs. {st.session_state.db['orders']['total'].sum():,.0f}")
-    m2.metric("Pending Orders", len(st.session_state.db['orders'][st.session_state.db['orders']['status']=='pending']))
-    m3.metric("Stock Value", f"Rs. {st.session_state.db['stock']['Value'].sum():,.0f}")
-    m4.metric("Active Returns", len(st.session_state.db['returns']))
+    st.markdown('<div class="top-nav"><h3>📊 Executive Business Dashboard</h3></div>', unsafe_allow_html=True)
     
-    fig = px.area(st.session_state.db['orders'], x='date', y='total', title="Sales Trend Analysis")
-    fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color="white")
-    st.plotly_chart(fig, use_container_width=True)
+    orders = st.session_state.db['orders']
+    
+    # දත්ත ගණනය කිරීම (Calculations)
+    total_leads = len(orders)
+    confirmed = len(orders[orders['status'] == 'confirm'])
+    pending = len(orders[orders['status'] == 'pending'])
+    no_answer = len(orders[orders['status'] == 'noanswer'])
+    cancel = len(orders[orders['status'] == 'cancel'])
+    fake = len(orders[orders['status'] == 'fake'])
+    hold = len(orders[orders['status'] == 'hold'])
+    
+    # 1. Row of Status Metrics (From Images)
+    st.markdown(f"""
+    <div class="metric-container">
+        <div class="metric-card"><h4>TOTAL LEADS</h4><h2>{total_leads}</h2></div>
+        <div class="metric-card status-confirmed"><h4>CONFIRMED</h4><h2>{confirmed}</h2></div>
+        <div class="metric-card status-pending"><h4>PENDING</h4><h2>{pending}</h2></div>
+        <div class="metric-card status-noanswer"><h4>NO ANSWER</h4><h2>{no_answer}</h2></div>
+        <div class="metric-card status-cancel"><h4>CANCEL</h4><h2>{cancel}</h2></div>
+        <div class="metric-card status-fake"><h4>FAKE</h4><h2>{fake}</h2></div>
+        <div class="metric-card status-hold"><h4>HOLD</h4><h2>{hold}</h2></div>
+    </div>
+    """, unsafe_allow_html=True)
 
-# --- INVENTORY CONTROL (Image 1, 2, 4) ---
+    # 2. Financial Metrics
+    col_f1, col_f2, col_f3 = st.columns(3)
+    col_f1.metric("Total Sales Revenue", f"Rs. {orders['total'].sum():,.0f}")
+    col_f2.metric("Net Profit (Est.)", f"Rs. {orders['total'].sum() * 0.4:,.0f}", delta="40% Margin")
+    col_f3.metric("Inventory Value", f"Rs. {st.session_state.db['stock']['Value'].sum():,.0f}")
+
+    st.divider()
+
+    # 3. Charts
+    c1, c2 = st.columns([2, 1])
+    with c1:
+        if not orders.empty:
+            fig = px.area(orders, x='date', y='total', title="📈 Revenue Growth Trend", 
+                          color_discrete_sequence=['#FFD700'])
+            fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color="white")
+            st.plotly_chart(fig, use_container_width=True)
+    with c2:
+        if not orders.empty:
+            fig_pie = px.pie(orders, names='status', title="🎯 Order Conversion",
+                             color_discrete_map={'confirm':'#2ecc71','pending':'#3498db','cancel':'#e74c3c'})
+            fig_pie.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color="white")
+            st.plotly_chart(fig_pie, use_container_width=True)
+
+# --- INVENTORY CONTROL ---
 elif nav == "📦 Inventory Control":
-    tab1, tab2, tab3, tab4 = st.tabs(["View Stocks", "Stock Adjustment", "GRN & PO", "Product Management"])
-    
+    tab1, tab2, tab3, tab4 = st.tabs(["📊 View Stocks", "⚙️ Stock Adjustment", "📝 GRN & PO", "🎨 Product Management"])
     with tab1:
-        st.subheader("📊 Current Inventory")
+        st.subheader("Inventory Grid")
         st.dataframe(st.session_state.db["stock"], use_container_width=True)
-        st.metric("Total Stock Items", st.session_state.db["stock"]["Qty"].sum())
-
     with tab2:
-        st.subheader("⚙️ Stock Adjustment & Waste")
-        with st.expander("Add Waste / Adjustment"):
-            p_code = st.selectbox("Product Code", st.session_state.db["stock"]["Code"])
-            adj_qty = st.number_input("Adjustment Qty (+/-)", value=0)
-            if st.button("Apply Adjustment"):
-                st.session_state.db["stock"].loc[st.session_state.db["stock"]["Code"] == p_code, "Qty"] += adj_qty
-                st.success("Adjustment Updated!")
-
+        p_code = st.selectbox("Select Product", st.session_state.db["stock"]["Code"])
+        adj_qty = st.number_input("Adjustment Quantity", value=0)
+        if st.button("Apply Adjustment"):
+            st.session_state.db["stock"].loc[st.session_state.db["stock"]["Code"] == p_code, "Qty"] += adj_qty
+            st.success("Updated Successfully!")
     with tab3:
-        st.subheader("📝 GRN & Purchase Orders")
-        col1, col2 = st.columns(2)
-        with col1: st.button("➕ New GRN")
-        with col2: st.button("📝 New PO")
+        st.button("➕ Create New GRN")
         st.dataframe(st.session_state.db["grn_po"], use_container_width=True)
-
     with tab4:
-        st.subheader("🎨 Product & Raw Items")
-        with st.form("new_prod"):
-            n_code = st.text_input("Product Code")
-            n_name = st.text_input("Product Name")
-            n_price = st.number_input("Selling Price", min_value=0)
-            n_type = st.selectbox("Item Type", ["Finished Product", "Raw Material"])
-            if st.form_submit_button("Create Product"):
-                new_p = {"Code": n_code, "Product": n_name, "Qty": 0, "Price": n_price, "Value": 0, "Type": n_type}
-                st.session_state.db["stock"] = pd.concat([st.session_state.db["stock"], pd.DataFrame([new_p])], ignore_index=True)
-                st.success("New Item Added to System")
+        with st.form("prod_form"):
+            st.text_input("Product Name")
+            st.number_input("Unit Price")
+            st.form_submit_button("Save Product")
 
-# --- SALES & LEADS (Image 3) ---
+# --- SALES & LEADS ---
 elif nav == "🛒 Sales & Leads":
-    tab1, tab2, tab3 = st.tabs(["New Order / Lead", "Order Search", "Blacklist Manager"])
-    
+    tab1, tab2, tab3 = st.tabs(["➕ New Lead", "🔍 Order Search", "🚫 Blacklist"])
     with tab1:
-        with st.form("order_form"):
-            c_name = st.text_input("Customer Name")
-            c_phone = st.text_input("Phone Number")
-            c_prod = st.selectbox("Product", st.session_state.db["stock"]["Product"])
-            c_qty = st.number_input("Qty", min_value=1)
-            if st.form_submit_button("Submit Order"):
-                price = st.session_state.db["stock"].loc[st.session_state.db["stock"]["Product"] == c_prod, "Price"].values[0]
-                oid = f"ORD-{uuid.uuid4().hex[:5].upper()}"
-                new_o = {"id": oid, "date": str(date.today()), "name": c_name, "phone": c_phone, "address": "N/A", "prod": c_prod, "qty": c_qty, "total": price*c_qty, "status": "pending", "staff": "Admin"}
+        with st.form("sale_f"):
+            c1, c2 = st.columns(2)
+            name = c1.text_input("Customer Name")
+            phone = c1.text_input("Mobile")
+            prod = c2.selectbox("Product", st.session_state.db["stock"]["Product"])
+            qty = c2.number_input("Qty", 1)
+            status = st.selectbox("Initial Status", ["pending", "confirm", "noanswer", "hold", "fake", "cancel"])
+            if st.form_submit_button("Save Lead"):
+                price = st.session_state.db["stock"].loc[st.session_state.db["stock"]["Product"] == prod, "Price"].values[0]
+                new_o = {"id": f"ORD-{uuid.uuid4().hex[:5].upper()}", "date": str(date.today()), "name": name, 
+                         "phone": phone, "address": "", "prod": prod, "qty": qty, "total": price*qty, 
+                         "status": status, "staff": "Admin"}
                 st.session_state.db["orders"] = pd.concat([st.session_state.db["orders"], pd.DataFrame([new_o])], ignore_index=True)
-                st.success(f"Order {oid} Placed Successfully!")
-
+                st.success("Lead Synced to Dashboard!")
     with tab2:
-        st.subheader("🔍 Order History & Search")
-        search_q = st.text_input("Search by Phone or ID")
-        df_o = st.session_state.db["orders"]
-        if search_q:
-            df_o = df_o[df_o['phone'].contains(search_q) | df_o['id'].contains(search_q)]
-        st.dataframe(df_o, use_container_width=True)
+        st.dataframe(st.session_state.db["orders"], use_container_width=True)
 
-# --- LOGISTICS (Image 7) ---
+# --- LOGISTICS ---
 elif nav == "🚚 Logistics":
-    st.subheader("📦 Dispatch & Courier Management")
-    col1, col2, col3 = st.columns(3)
-    col1.button("🚢 Confirm Dispatch")
-    col2.button("🏷️ Print Packing List")
-    col3.button("🛰️ Search Waybills")
-    
+    st.title("Logistics Center")
+    col1, col2 = st.columns(2)
+    col1.button("🚢 Confirm Shipments")
+    col2.button("🏷️ Print All Waybills")
     st.dataframe(st.session_state.db["logistics"], use_container_width=True)
 
-# --- FINANCE (Image 6) ---
+# --- FINANCE ---
 elif nav == "💰 Finance":
-    st.subheader("💸 Expense & POS Manager")
-    with st.expander("➕ Add New Expense"):
-        e_cat = st.selectbox("Category", ["Marketing", "Courier", "Salaries", "Utility"])
-        e_amt = st.number_input("Amount", min_value=0)
-        if st.button("Save Expense"):
-            new_e = {"date": str(date.today()), "type": "General", "category": e_cat, "amount": e_amt, "note": ""}
-            st.session_state.db["expenses"] = pd.concat([st.session_state.db["expenses"], pd.DataFrame([new_e])], ignore_index=True)
-            st.success("Expense Recorded")
-    
+    st.title("Financial Overview")
+    st.metric("Total Expenses", f"Rs. {st.session_state.db['expenses']['amount'].sum():,.0f}")
     st.dataframe(st.session_state.db["expenses"], use_container_width=True)
 
-# --- RETURNS (Image 5) ---
+# --- RETURNS ---
 elif nav == "🔄 Returns":
-    st.subheader("🔙 Return Order Management")
-    tab1, tab2 = st.tabs(["Add Return", "Pending Returns"])
-    with tab1:
-        rid = st.text_input("Order ID for Return")
-        reason = st.selectbox("Reason", ["Damage", "Wrong Item", "Customer Refused"])
-        if st.button("Process Return"):
-            new_r = {"order_id": rid, "date": str(date.today()), "reason": reason, "status": "Pending"}
-            st.session_state.db["returns"] = pd.concat([st.session_state.db["returns"], pd.DataFrame([new_r])], ignore_index=True)
-            st.warning("Return Logged and Pending Approval")
-    with tab2:
-        st.dataframe(st.session_state.db["returns"], use_container_width=True)
+    st.title("Returns Management")
+    st.dataframe(st.session_state.db["returns"], use_container_width=True)
 
 # =========================================================
 # 5. AUTO-SAVE ENGINE
